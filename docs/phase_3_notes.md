@@ -1,5 +1,7 @@
 # Phase 3: XGBoost and MLflow
 
+> Historical checkpoint: Phase 3 recorded **17 tests passed** at that phase. The current repository test total is reported in the root README.
+
 ## How training works
 
 `make train-xgb-local` runs the deterministic training flow against `file:./mlruns_local`; `make train-xgb` uses the MLflow HTTP server at `http://localhost:5000`. Training requests historical features from Feast for each transaction and joins only the fraud label and split metadata from `features.parquet`. This local run used Feast historical retrieval. If retrieval fails or takes longer than five minutes, the code uses the parquet fallback and records the reason.

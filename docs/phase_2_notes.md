@@ -1,5 +1,7 @@
 # Phase 2: Causal features and Feast
 
+> Historical checkpoint: Phase 2 recorded **8 tests passed** at that phase. The current repository test total is reported in the root README.
+
 ## What this phase does
 
 `src/features/build_features.py` reads the existing Phase 1 train, validation, and test parquet files, combines them in chronological order, and writes `data/processed/features.parquet`. It does not rewrite the Phase 1 split files or EDA outputs. The feature table has the required `transaction_id`, UTC `event_timestamp`, `uid`, features, fraud label, and split columns. The event timestamp is `2017-11-30 00:00:00 UTC + TransactionDT`.

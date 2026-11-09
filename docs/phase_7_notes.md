@@ -1,5 +1,7 @@
 # Phase 7: analyst dashboard
 
+> Historical checkpoint: Phase 7 recorded **42 tests passed** at that phase. Later phases added tests; the current repository test total is reported in the root README.
+
 ## What it does
 
 The dashboard reads stored alerts from the FastAPI service, lets an analyst filter by status, score, and offline ring, and opens a case with its stored XGBoost/GNN/blended scores and the five largest signed XGBoost feature contributions. The contribution endpoint fetches that transaction's features from the Feast online store and asks the XGBoost booster for `pred_contribs`. Case buttons submit feedback to the existing `/feedback` endpoint.

@@ -1,5 +1,7 @@
 # Phase 4: Streaming and serving
 
+> Historical checkpoint: this phase's note does not record a numeric test count; it documents its checks and environment limitations at the time. The current repository test total is reported in the root README.
+
 ## What this phase adds
 
 The model export command copies the registered `fraud-xgb` model plus its threshold and feature-list artifacts to `artifacts/xgb/`. That directory is ignored by Git. The API and Kafka consumer share `FraudScorer`: it reads the feature list, asks Feast's SQLite online store for the requested transaction's feature values, applies the saved XGBoost model and threshold, and returns `xgb_score`, `alert`, `gnn_score`, `final_score`, `ring_id`, and `ring_size`. GNN and ring fields are populated when Phase 5 artifacts are available; otherwise they remain null. The per-call latency covers Feast lookup plus model inference.

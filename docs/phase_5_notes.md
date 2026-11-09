@@ -1,5 +1,7 @@
 # Phase 5: Graph, GNN, and blend (updated Phase 5b run)
 
+> Historical checkpoint: this note records the Phase 5b model run; a numeric phase-specific pytest count was not recorded here. The current repository test total is reported in the root README.
+
 ## What changed
 
 The original GNN run stopped after only eight full-batch updates and reached validation PR-AUC 0.0439. That was too early to support the previous no-lift conclusion. This retraining adds a direct transaction-feature projection to the classifier path, trains up to 300 epochs with patience 30, evaluates validation PR-AUC each epoch, and tests learning rates 0.003, 0.01, and 0.03 with hidden sizes 64 and 128. Dropout is 0.2. Each epoch's training loss and validation PR-AUC are logged to MLflow. The selected configuration and epoch traces are in `results/ablation.json`; the plotted traces are in `results/gnn_training_curve.png`.

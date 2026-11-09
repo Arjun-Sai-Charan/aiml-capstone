@@ -1,5 +1,7 @@
 # Graph and GNN notes (updated Phase 5b run)
 
+> Historical checkpoint: this note records the Phase 5b GNN run; a numeric phase-specific pytest count was not recorded here. The current repository test total is reported in the root README.
+
 The graph has transaction nodes and entity nodes for UID, `DeviceInfo`, `P_emaildomain`, and `addr1`. Each transaction connects to each non-null entity, and reverse edges are included. Labels are kept outside the graph and used only for loss and evaluation.
 
 Transaction nodes use the same **52** numeric input features as the existing XGBoost model. Missing values are median-imputed and standardized using statistics fit on the 90,000 training transactions only. The two-layer heterogeneous GraphSAGE has a direct transaction-feature projection into the classifier path, so transaction logits use both the transaction's own features and messages from neighboring entities/transactions. It uses BCE with the train negative/positive ratio as `pos_weight`, dropout 0.2, and early stopping on validation PR-AUC.

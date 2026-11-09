@@ -1,5 +1,7 @@
 # Phase 0 notes: scaffold
 
+> Historical checkpoint: this note records Phase 0/0.5 verification. No phase-specific pytest count was recorded here; later phase test counts are checkpoint counts, not the current suite total.
+
 ## What was built and how it works
 
 The repository now has the requested folder layout and a shared configuration module. `make setup` creates a Python virtual environment and installs pinned dependencies. Kafka is configured as one combined broker/controller using KRaft, so it has no ZooKeeper service. MLflow uses a SQLite backend and a persistent local artifact directory. Both services have container memory limits.

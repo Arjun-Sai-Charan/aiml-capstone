@@ -1,5 +1,7 @@
 # Phase 6b: drift calibrated to natural change and candidate retraining
 
+> Historical checkpoint: this note records Phase 6b drift and retraining results; a numeric phase-specific pytest count was not recorded here. The current repository test total is reported in the root README.
+
 ## What drift means
 
 Drift is a change in feature distributions, not proof that accuracy fell or that fraud behavior changed. This phase uses Evidently 0.5.1 on the 52 XGBoost input features. Its API was checked in the installed environment (`Report`, `DataDriftPreset`, `Report.run`, `as_dict`, and `save_html`). Every report records the detected columns and the statistical test names. Columns that can accumulate or change as history grows (the `D*` values, transaction counts, `uid_prior_txn_count`, and `uid_is_hub`) are tagged `cumulative_by_construction`.

@@ -1,5 +1,7 @@
 # Phase 1: Data preparation and exploratory analysis
 
+> Historical checkpoint: Phase 1 recorded **4 tests passed** at that phase. The current repository test total is reported in the root README.
+
 ## What this phase does
 
 `make data` runs `src.data.prepare` with the Python interpreter in `.venv`. It reads only `train_transaction.csv` and `train_identity.csv`. To keep memory use manageable, it first reads the transaction IDs and timestamps, identifies the earliest 150,000 rows by `TransactionDT`, then reads those rows and matching identity rows in chunks. It left joins on `TransactionID`, sorts chronologically, creates a stable SHA-256 `uid` from `card1`, `card2`, `card3`, `card5`, and `addr1` (missing values become a fixed sentinel), and writes separate parquet files for train, validation, and test.
