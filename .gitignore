@@ -6,6 +6,8 @@ venv/
 .coverage
 htmlcov/
 .env
+demo_logs/
+audit/
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*

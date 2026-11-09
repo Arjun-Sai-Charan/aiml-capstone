@@ -19,6 +19,13 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_NUM_PARTITIONS: 1
       KAFKA_HEAP_OPTS: -Xms512m -Xmx768m
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 8s
+      retries: 18
+      start_period: 35s
+    restart: unless-stopped
     mem_limit: 1200m
     volumes:
       - kafka_data:/var/lib/kafka/data
@@ -41,6 +48,13 @@ services:
       - "5000:5000"
     volumes:
       - mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    restart: unless-stopped
     mem_limit: 768m
 
   api:
@@ -56,8 +70,17 @@ services:
     volumes:
       - serving_runtime:/runtime
     depends_on:
-      - kafka
-      - mlflow
+      kafka:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
     mem_limit: 768m
 
   consumer:
@@ -71,9 +94,10 @@ services:
     volumes:
       - serving_runtime:/runtime
     depends_on:
-      - kafka
-      - mlflow
-      - api
+      kafka:
+        condition: service_healthy
+      api:
+        condition: service_healthy
     restart: unless-stopped
     mem_limit: 640m
 
@@ -84,10 +108,31 @@ services:
     environment:
       FRAUD_API_URL: http://api:8000
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
     mem_limit: 384m
+
+  producer:
+    image: fraud-api:phase8
+    profiles: ["manual-demo"]
+    command: ["python", "-m", "src.streaming.producer", "--docker", "--limit", "${DEMO_TRANSACTION_LIMIT:-300}", "--rate", "${DEMO_PRODUCER_RATE:-20}"]
+    environment:
+      KAFKA_BOOTSTRAP_DOCKER: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+    mem_limit: 256m
 
 volumes:
   kafka_data:
   mlflow_data:
   serving_runtime:
+    name: fraud-platform-demo-serving
