@@ -4,7 +4,7 @@ Base URL in local development: `http://localhost:8000`. The application is defin
 
 ## Response examples
 
-These examples are based on the deterministic TestClient fixtures in `tests/test_phase_4_serving.py` and `tests/test_phase_7_dashboard.py`, which exercise the API with a temporary SQLite database and a test scorer. They are actual API response shapes from the test fixtures, not output from a live Kafka or MLflow deployment. Generated ISO timestamps are abbreviated as `<timestamp>` because they change on each run. The live-artifact TestClient capture was **UNVERIFIED** in this documentation session: opening the local Feast store stalled in this sandbox.
+These response bodies were captured on 2026-11-08 by running FastAPI `TestClient` against a temporary SQLite database, with deterministic test scorer values modeled on `tests/test_phase_4_serving.py` and `tests/test_phase_7_dashboard.py`. They are actual API responses, but the scorer is a test double; they are not live model/Feast or Kafka responses. The timestamp values below are the generated timestamps from that capture.
 
 ### `GET /health`
 
@@ -47,7 +47,7 @@ Request: optional `limit` integer from 1 through 1000; optional nonempty `status
 ```json
 {
   "alerts": [
-    {"transaction_id": 5001, "xgb_score": 0.91, "status": "open", "created_at": "<timestamp>"}
+    {"transaction_id": 5001, "xgb_score": 0.91, "status": "open", "created_at": "2026-11-08T18:05:10.248381+00:00"}
   ]
 }
 ```
@@ -68,7 +68,7 @@ TestClient response shape:
   "transaction_id": 5001,
   "analyst_label": "fraud",
   "case_status": "closed",
-  "created_at": "<timestamp>"
+  "created_at": "2026-11-08T18:05:10.276368+00:00"
 }
 ```
 
@@ -102,7 +102,7 @@ TestClient response shape, from the detail endpoint fixture:
     "ring_id": "ring-a",
     "ring_size": 2,
     "latency_ms": 3.0,
-    "created_at": "<timestamp>",
+    "created_at": "2026-11-08T18:05:10.300275+00:00",
     "status": "open",
     "analyst_label": null,
     "case_status": null
@@ -112,7 +112,7 @@ TestClient response shape, from the detail endpoint fixture:
     {"feature": "f1", "contribution": 0.4},
     {"feature": "f2", "contribution": 0.3},
     {"feature": "f3", "contribution": 0.2},
-    {"feature": "f4", "contribution": 0.1}
+    {"feature": "f4", "contribution": 0.09999999999999998}
   ]
 }
 ```
@@ -143,7 +143,7 @@ The ring membership is an offline artifact; the endpoint summarizes its current 
 
 ## Errors
 
-Error bodies use FastAPI's `{"detail": ...}` format. These response shapes are from the handlers and TestClient assertions:
+Error bodies use FastAPI's `{"detail": ...}` format. The missing-feature score response was captured with TestClient; the other statuses were returned by the same test-client run:
 
 | Condition | Status | Example body |
 |---|---:|---|
@@ -151,7 +151,7 @@ Error bodies use FastAPI's `{"detail": ...}` format. These response shapes are f
 | No stored transaction for detail | 404 | `{"detail":"No stored score for transaction 404"}` |
 | Feedback for a transaction without a stored score | 404 | `{"detail":"No score for transaction 404"}` |
 | Contribution lookup/model error on detail | 503 | `{"detail":"Feature contributions unavailable: <exception type>"}` |
-| `transaction_id` is zero or invalid | 422 | FastAPI validation response with `detail` entries identifying the invalid field |
+| `transaction_id` is zero or invalid | 422 | `{"detail":[{"type":"greater_than_equal","loc":["body","transaction_id"],"msg":"Input should be greater than or equal to 1","input":0,"ctx":{"ge":1}}]}` |
 
 An unexpected scorer or database error on `/score`, `/alerts`, `/metrics-lite`, or `/rings` can still surface as an HTTP 500; the API does not normalize every backend failure.
 
@@ -170,5 +170,7 @@ An unexpected scorer or database error on `/score`, `/alerts`, `/metrics-lite`, 
 | `FRAUD_API_URL` | Dashboard API base URL | `http://localhost:8000` |
 | `FRAUD_DRIFT_SHARE_THRESHOLD` | Optional override for drift trigger | read natural baseline, else 0.30 |
 | `FRAUD_MIN_ANALYST_FEEDBACK` | Feedback count trigger | 25 |
+| `DEMO_TRANSACTION_LIMIT` | Compose producer transaction count override | 300 |
+| `DEMO_PRODUCER_RATE` | Compose producer rate override (transactions/second) | 20 |
 
-Kafka CLI options (`--docker`, `--bootstrap-server`, topic flags) can override the corresponding defaults per process. `TRANSACTION_LIMIT` and `PRODUCER_RATE` are Kubernetes ConfigMap values for the producer Job, not application-level environment reads.
+Kafka CLI options (`--docker`, `--bootstrap-server`, topic flags) can override the corresponding defaults per process. `TRANSACTION_LIMIT` and `PRODUCER_RATE` are Kubernetes ConfigMap values for the producer Job, not application-level environment reads. Dependency versions are pinned in `requirements.txt` and the service-specific `requirements-*.txt` files.

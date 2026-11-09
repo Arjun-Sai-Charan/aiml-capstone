@@ -57,7 +57,7 @@
 
 **Why is test precision at a 1% alert budget higher than validation?**
 
-Test fraud prevalence is 3.67%, versus 1.72% validation (`results/xgb_metrics.json`): about 2.13 times as high. With the same top-ranked fraction, higher prevalence can yield more true positives and higher precision. The periods also differ, so prevalence alone does not prove why; recall and ranking metrics must be shown with the base rates.
+At the 1% alert budget, unweighted XGBoost precision is 0.6033 on validation and 0.8967 on test (`results/xgb_metrics.json`). Test prevalence is 3.67%, versus 1.72% validation, about 2.13 times as high. A higher positive rate can yield more true positives among the same top-ranked fraction, but the periods also differ, so prevalence alone does not prove why; recall and ranking metrics must be shown with the base rates.
 
 **Why is the GNN not in the final score?**
 

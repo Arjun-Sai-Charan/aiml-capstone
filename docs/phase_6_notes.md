@@ -25,7 +25,7 @@ Candidate version **4** was registered with the `candidate` alias and the trigge
 | Champion v2 | 0.55306 | 0.89322 | 0.61333 / 0.50182 |
 | Candidate v4 | 0.59838 | 0.90012 | 0.64333 / 0.52636 |
 
-Full budget metrics for 1%, 2%, 3%, and 5% are in [retrain_log.json](../results/retrain_log.json). Test was used for this final champion-versus-candidate comparison only; it did not choose hyperparameters. Promotion remains manual: inspect a candidate and run `make promote-candidate PROMOTE_ARGS="--version N"` (or `.venv/bin/python -m scripts.promote_candidate --version N`). `--dry-run` previews without changing aliases. The server MLflow run is **UNVERIFIED** because this sandbox cannot reach the user's MLflow service.
+Full budget metrics for 1%, 2%, 3%, and 5% are in [retrain_log.json](../results/retrain_log.json). Test was used for this final champion-versus-candidate comparison only; it did not choose hyperparameters. Promotion remains manual: inspect a candidate and run `.venv/bin/python -m scripts.promote_candidate --version N` (optionally add `--dry-run` to preview without changing aliases). The server MLflow run is **UNVERIFIED** because this sandbox cannot reach the user's MLflow service.
 
 The feedback path remains available with `--include-feedback`. Confirmed analyst-labeled rows from the test replay are added to training; such a candidate is evaluated on validation only because feedback rows originate from test replay.
 

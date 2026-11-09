@@ -42,7 +42,7 @@ flowchart LR
 | API and persistence | Exposes score, alert, feedback, detail, ring and lightweight metrics endpoints; persists service state in SQLite. | `src/serving/` |
 | Drift and retraining | Compares adjacent time windows with Evidently and can register an expanded-window candidate without automatic promotion. | `src/monitoring/` |
 | Analyst dashboard | Displays alerts, case state, score explanations, rings and local drift/retraining summaries. | `src/dashboard/` |
-| Packaging and deployment | Three purpose-specific Python images, Compose fallback, and Minikube manifests. | `docker/`, `k8s/` |
+| Packaging and deployment | Three purpose-specific Python images and a Compose-first demo; Minikube manifests are static-only and runtime unverified. | `docker/`, `k8s/`, `scripts/demo_*.sh`, root batch launchers |
 
 ## Key design decisions
 

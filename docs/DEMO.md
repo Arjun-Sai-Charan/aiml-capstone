@@ -1,101 +1,34 @@
-# Five-minute demo runbook
+# Five-minute Compose demo
 
-## Verification status
+## Verification note
 
-**UNVERIFIED:** Docker Compose and Minikube runtime paths were not run in this documentation environment. The commands below are the intended user-side sequence. Expected output describes the application contract and producer's documented count; it is not captured deployment output. Complete the generated-data/model steps first and build images from the repository root.
+The walkthrough below is the intended Compose demo script. Container behavior is **UNVERIFIED** in this sandbox. Complete the one-time data/artifact preparation described in [README.md](../README.md) and [VERIFY_ONCE.md](VERIFY_ONCE.md). The first image build can take about 15–25 minutes; complete it before presenting.
 
-## Prerequisites
+## Run of show
 
-For either option, the repository needs the two permitted Kaggle training CSVs under `data/raw/`, generated processed features, a materialized Feast online store, and exported XGBoost/GNN artifacts. Build the images before first run. The API image includes the local Feast online SQLite store, so rebuilding it can take time and requires the generated files.
+| Time | What to do | What to say |
+|---|---|---|
+| 0:00–0:40 | Double-click `START_DEMO.bat`; wait for the browser to open `http://localhost:8501`. | “This prototype replays chronological test transactions through Kafka and presents resulting scores as analyst cases.” |
+| 0:40–1:30 | Point to dashboard KPIs, drift state and the last retraining decision. | “The dashboard reads the scoring API and local report summaries. The drift retraining example is a synthetic stress test, not a real production incident.” |
+| 1:30–2:30 | In Alerts, filter/open an alert and show XGBoost/GNN/final score, ring fields and top feature contributions. | “The model explanation is the top XGBoost contributions for this transaction. A null GNN or ring field is valid when no offline GNN artifact matches it.” |
+| 2:30–3:30 | Submit an analyst case status such as Under review; return to the alert list. | “Feedback is persisted in the local SQLite demonstration database. It is a later label signal, not an input to the score that was just produced.” |
+| 3:30–4:20 | Open Rings and show ring size/status summaries and the offline evaluation note. | “Ring membership is computed offline; weak links can connect unrelated transactions. The label-based precision comparison is post-hoc and unavailable during live scoring.” |
+| 4:20–5:00 | Double-click `CHECK_DEMO.bat`; show the result window. | “The smoke check confirms containers, API, processed score count, alert presence and dashboard reachability. It does not prove production durability.” |
 
-## A. Docker Compose fallback
+## Expected output
 
-1. Start the stack:
+The launcher should report Kafka, MLflow, API and dashboard healthy, create `transactions` and `fraud-scores`, then print producer JSON containing `"published": 300`. If replay fails, it should print that the existing seed script is being used. It waits for the API to report at least 300 scored rows and prints the dashboard/API/MLflow URLs. The check window should show PASS for each configured check; alert count is data-dependent but must be nonzero for the demo check to pass.
 
-   ```bash
-   docker compose -f docker/docker-compose.full.yml up -d
-   docker compose -f docker/docker-compose.full.yml ps
-   ```
+## Screenshots to save
 
-   Expected: `kafka`, `mlflow`, `api`, `consumer`, and `dashboard` containers are listed. A `Up` state is only a process-level check; verify health below.
+Save under `docs/screenshots/`:
 
-2. Check API health and open the dashboard:
+1. Dashboard overview with KPIs and alert table.
+2. An alert detail with scores and top feature contributions.
+3. Rings page with the offline-label caveat visible.
 
-   ```bash
-   curl -sS http://localhost:8000/health
-   curl -sS http://localhost:8000/metrics-lite
-   ```
+Only `.gitkeep` is present until the user captures screenshots. Do not include raw card data or secrets.
 
-   Expected health body: `{"status":"ok"}`. Open `http://localhost:8501`; MLflow is available at `http://localhost:5000`.
+## Stop
 
-3. Replay the test split through the Compose network:
-
-   ```bash
-   docker compose -f docker/docker-compose.full.yml run --rm api \
-     python -m src.streaming.producer --docker --limit 1000 --rate 20
-   ```
-
-   Expected producer JSON includes `"published": 1000`. The consumer runs continuously. Poll `curl -sS http://localhost:8000/metrics-lite` until score count reaches the replay count in a clean database; alert count depends on the saved model cutoff and input rows.
-
-4. In the dashboard, open an alert, inspect its scores/contributions, and submit a case status. The database is a named Compose volume. To reset this demonstration before rerunning, stop the stack and remove volumes:
-
-   ```bash
-   docker compose -f docker/docker-compose.full.yml down -v
-   ```
-
-## B. Minikube
-
-1. Start the requested local cluster and deploy:
-
-   ```bash
-   minikube start --driver=docker --memory=5120 --cpus=3
-   make k8s-build
-   make k8s-up
-   kubectl wait --for=condition=Ready pod -l app=kafka -n fraud --timeout=5m
-   kubectl wait --for=condition=Available deployment/mlflow -n fraud --timeout=10m
-   kubectl wait --for=condition=Available deployment/scoring -n fraud --timeout=10m
-   kubectl wait --for=condition=Available deployment/dashboard -n fraud --timeout=10m
-   make k8s-status
-   ```
-
-   Expected pod roles: Kafka `1/1`, MLflow `1/1`, scoring `2/2`, dashboard `1/1`; the producer Job appears as `Completed` after replay. Names gain generated suffixes. This is a reference state, not verified output.
-
-2. Start three port-forwards, each in its own terminal:
-
-   ```bash
-   kubectl port-forward -n fraud svc/scoring 8000:8000
-   kubectl port-forward -n fraud svc/dashboard 8501:8501
-   kubectl port-forward -n fraud svc/mlflow 5000:5000
-   ```
-
-   Check `curl -sS http://localhost:8000/health` and open `http://localhost:8501`.
-
-3. Run and inspect replay:
-
-   ```bash
-   make k8s-demo
-   kubectl get jobs,pods -n fraud -o wide
-   kubectl logs -n fraud job/producer-demo --tail=100
-   kubectl logs -n fraud deployment/scoring -c consumer --tail=100
-   curl -sS http://localhost:8000/metrics-lite
-   ```
-
-   The producer Job defaults to 1,000 transactions at 20 transactions/second through the `fraud-settings` ConfigMap. Expected completed Job output and service score count are not runtime-verified. Pod `emptyDir` contents disappear when the pod is recreated.
-
-4. Troubleshoot a pod before repeating the demo:
-
-   ```bash
-   kubectl get pods -n fraud -o wide
-   kubectl describe pod -n fraud <pod-name>
-   kubectl logs -n fraud <pod-name> -c <container-name> --previous
-   ```
-
-## Three screenshots to capture
-
-Save under `docs/screenshots/` and include no raw payment data:
-
-1. Dashboard overview: KPI row and filtered alert table.
-2. Case detail: XGBoost/GNN/final scores, ring fields, top contributions, and analyst status controls.
-3. Rings view: ring grouping plus its note that fraud labels are used only for offline evaluation.
-
-`docs/screenshots/.gitkeep` reserves the folder; screenshots are not present yet.
+Double-click `STOP_DEMO.bat`. It stops the Compose containers while keeping images and named data volumes. The next `START_DEMO.bat` run resets the serving database so the replay starts cleanly.
