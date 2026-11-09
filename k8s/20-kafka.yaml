@@ -15,6 +15,7 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+        runAsUser: 1000
         fsGroup: 1000
       containers:
         - name: broker

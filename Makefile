@@ -2,7 +2,7 @@ SHELL := /bin/bash
 UV ?= uv
 VENV ?= .venv
 
-.PHONY: setup data features feature-store train train-xgb train-xgb-local train-gnn train-gnn-local drift retrain retrain-local export-model benchmark ring-precision demo-data dashboard k8s-build k8s-up k8s-demo k8s-status k8s-down gnn serve serve-registry test
+.PHONY: setup data features feature-store train train-xgb train-xgb-local train-gnn train-gnn-local drift retrain retrain-local export-model benchmark ring-precision demo-data dashboard demo-start demo-stop demo-check k8s-build k8s-up k8s-demo k8s-status k8s-down gnn serve serve-registry test push
 setup:
 	$(UV) venv --python 3.11 $(VENV)
 	$(UV) pip install --index-strategy unsafe-best-match --python $(VENV)/bin/python -r requirements.txt
@@ -67,16 +67,40 @@ demo-data:
 dashboard:
 	PYTHONPATH=. $(VENV)/bin/streamlit run src/dashboard/app.py --server.port 8501
 
+demo-start:
+	./scripts/demo_start.sh
+
+demo-stop:
+	./scripts/demo_stop.sh
+
+demo-check:
+	./scripts/demo_check.sh
+
 k8s-build:
-	eval "$$(minikube docker-env)" && docker build -f docker/api.Dockerfile -t fraud-api:phase8 . && docker build -f docker/dashboard.Dockerfile -t fraud-dashboard:phase8 . && docker build -f docker/jobs.Dockerfile -t fraud-jobs:phase8 .
+	@set -e; \
+	build_and_load() { \
+	  image="$$1"; dockerfile="$$2"; \
+	  echo "Building $$image with host Docker..."; \
+	  docker build -f "$$dockerfile" -t "$$image" . || { echo "ERROR: docker build failed for $$image ($$dockerfile)." >&2; return 1; }; \
+	  echo "Loading $$image into Minikube's containerd image store..."; \
+	  minikube image load "$$image" || { echo "ERROR: minikube image load failed for $$image." >&2; return 1; }; \
+	}; \
+	build_and_load fraud-api:phase8 docker/api.Dockerfile && \
+	build_and_load fraud-dashboard:phase8 docker/dashboard.Dockerfile && \
+	build_and_load fraud-jobs:phase8 docker/jobs.Dockerfile
 
 k8s-up:
 	kubectl apply -f k8s/00-namespace.yaml
-	kubectl apply -f k8s/
+	kubectl apply -f k8s/10-config.yaml
+	kubectl apply -f k8s/20-kafka.yaml
+	kubectl apply -f k8s/30-mlflow.yaml
+	kubectl apply -f k8s/40-scoring.yaml
+	kubectl apply -f k8s/50-dashboard.yaml
+	kubectl apply -f k8s/60-jobs.yaml
 
 k8s-demo:
 	kubectl delete job producer-demo -n fraud --ignore-not-found
-	kubectl apply -f k8s/60-jobs.yaml
+	kubectl apply -f k8s/61-producer-job.yaml
 	kubectl wait --for=condition=complete job/producer-demo -n fraud --timeout=15m
 
 k8s-status:
@@ -87,4 +111,9 @@ k8s-down:
 
 test:
 	$(VENV)/bin/python -m pytest -q
+
+push:
+	@email="$$(git config user.email)"; case "$$email" in *@users.noreply.github.com) ;; *) echo "ERROR: configure your GitHub noreply email before pushing." >&2; exit 1 ;; esac
+	git rebase origin/main --exec "git commit --amend --reset-author --no-edit"
+	git push
 

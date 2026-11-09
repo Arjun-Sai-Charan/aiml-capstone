@@ -145,7 +145,7 @@ def test_manifests_have_resources_non_root_probes_and_local_images():
 def test_makefile_build_image_names_match_manifests():
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     build = makefile.split("k8s-build:", 1)[1].split("\nk8s-up:", 1)[0]
-    built = set(re.findall(r"-t\s+(fraud-[a-z]+:phase8)", build))
+    built = set(re.findall(r"build_and_load\s+(fraud-[a-z]+:phase8)", build))
     manifest_images = {
         container["image"]
         for document in _manifests()
@@ -154,6 +154,8 @@ def test_makefile_build_image_names_match_manifests():
         if container["image"].startswith("fraud-")
     }
     assert built == manifest_images == {"fraud-api:phase8", "fraud-dashboard:phase8", "fraud-jobs:phase8"}
+    assert "docker build" in build and "minikube image load" in build
+    assert "minikube docker-env" not in build
 
 
 def test_compose_fallback_uses_all_three_images_and_shared_runtime_db():
