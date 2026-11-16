@@ -1,5 +1,6 @@
 @echo off
 setlocal
+cd /d "%TEMP%" >nul 2>&1
 title Fraud Detection Demo - Stop
 echo Stopping the demo containers. Images and data will be kept.
 wsl.exe -d Ubuntu -- bash -lc "cd ~/fraud-platform && ./scripts/demo_stop.sh"

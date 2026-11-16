@@ -1,5 +1,6 @@
 @echo off
 setlocal
+cd /d "%TEMP%" >nul 2>&1
 title Fraud Detection Demo - Check
 echo Checking Docker, demo containers, API, scored transactions, alerts, and dashboard...
 wsl.exe -d Ubuntu -- bash -lc "cd ~/fraud-platform && ./scripts/demo_check.sh"

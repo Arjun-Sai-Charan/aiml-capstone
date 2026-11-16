@@ -12,7 +12,7 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 dc=(docker compose --project-name "$PROJECT" --file "$COMPOSE_FILE")
 required_ports=(8000 8501 9092 5000)
 health_timeout=300
-score_timeout=600
+score_timeout=120
 
 say() { printf '\n[demo] %s\n' "$*"; }
 fail() { say "ERROR: $*" >&2; exit 1; }
@@ -69,16 +69,18 @@ check_ports() {
 }
 
 build_missing_images() {
-  local image dockerfile entry
-  local -a images=("fraud-api:phase8|docker/api.Dockerfile" "fraud-dashboard:phase8|docker/dashboard.Dockerfile" "fraud-jobs:phase8|docker/jobs.Dockerfile")
+  local image dockerfile entry rebuild
+  local -a images=("fraud-api:phase8|docker/api.Dockerfile|yes" "fraud-dashboard:phase8|docker/dashboard.Dockerfile|yes" "fraud-jobs:phase8|docker/jobs.Dockerfile|no")
   for entry in "${images[@]}"; do
     image="${entry%%|*}"
     dockerfile="${entry#*|}"
-    if docker image inspect "$image" >/dev/null 2>&1; then
+    rebuild="${dockerfile##*|}"
+    dockerfile="${dockerfile%%|*}"
+    if [[ "$rebuild" == "no" ]] && docker image inspect "$image" >/dev/null 2>&1; then
       say "Image $image is already available."
       continue
     fi
-    say "Building $image. The first build can take about 15–25 minutes because packages and the Feast store are large."
+    if [[ "$rebuild" == "yes" ]]; then say "Refreshing $image so the latest scorer and pinned dashboard dependencies are applied."; else say "Building $image. The first build can take about 15–25 minutes because packages and the Feast store are large."; fi
     docker build --file "$ROOT/$dockerfile" --tag "$image" "$ROOT" || fail "Building $image failed. See output above and $LOG_FILE."
   done
 }
@@ -122,7 +124,21 @@ wait_for_scores() {
     fi
     sleep 5
   done
-  fail "The API did not reach the required score count. Check demo_logs and run CHECK_DEMO.bat."
+  say "The consumer did not score the replay before the timeout. Saving API, consumer, and Kafka logs, then loading the local dashboard sample."
+  local diagnostic_log="$LOG_DIR/compose-failure-$(date -u +%Y%m%dT%H%M%SZ).log"
+  "${dc[@]}" logs --no-color --tail=300 api consumer kafka >"$diagnostic_log" 2>&1 || true
+  say "Consumer diagnostics saved to $diagnostic_log"
+  "${dc[@]}" run --rm --no-deps api python -m scripts.seed_demo_alerts --limit 300 --database /runtime/serving.db || fail "Both Kafka scoring and the local seed fallback failed. Send $LOG_FILE and $diagnostic_log."
+  deadline=$((SECONDS + 60))
+  while (( SECONDS < deadline )); do
+    payload="$(curl --silent --show-error --fail --max-time 5 http://localhost:8000/metrics-lite 2>/dev/null || true)"
+    if [[ -n "$payload" ]]; then
+      count="$(metric_value score_count "$payload" 2>/dev/null || true)"
+      if [[ "$count" =~ ^[0-9]+$ ]] && (( count >= 300 )); then say "Seed fallback stored $count scores. The dashboard is populated; Kafka consumer logs are in $diagnostic_log."; return; fi
+    fi
+    sleep 3
+  done
+  fail "The local seed fallback did not populate the API. Send $LOG_FILE and $diagnostic_log."
 }
 
 ensure_docker

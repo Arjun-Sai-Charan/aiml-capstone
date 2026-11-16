@@ -1,5 +1,6 @@
 @echo off
 setlocal
+cd /d "%TEMP%" >nul 2>&1
 title Fraud Detection Demo - Start
 echo Starting the fraud detection demo in Ubuntu on WSL2...
 echo The first start may take a while while Docker builds the application images.

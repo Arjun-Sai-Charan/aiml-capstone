@@ -62,6 +62,24 @@ def test_scorer_reads_feast_online_features_and_returns_phase5_schema():
     assert result["latency_ms"] >= 0
 
 
+def test_native_booster_feature_contributions_do_not_require_sklearn_wrapper():
+    class FakeBooster:
+        def predict(self, _matrix, *, pred_contribs=False):
+            assert pred_contribs is True
+            return np.array([[0.2, -0.1, 0.3]])
+
+    scorer = FraudScorer(
+        model=FakeBooster(),
+        feature_store=FakeFeatureStore(),
+        feature_list=["transaction_dt", "TransactionAmt"],
+        threshold={"threshold": 0.5},
+    )
+    assert scorer.feature_contributions(42) == [
+        {"feature": "transaction_dt", "contribution": 0.2},
+        {"feature": "TransactionAmt", "contribution": -0.1},
+    ]
+
+
 def test_api_score_alert_feedback_and_metrics_round_trip(tmp_path):
     class MockScorer:
         def score(self, transaction_id):

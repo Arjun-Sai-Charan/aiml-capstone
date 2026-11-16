@@ -15,6 +15,7 @@ import pandas as pd
 from feast import FeatureStore
 from mlflow.tracking import MlflowClient
 from xgboost import DMatrix
+from xgboost import Booster
 
 from src.common.config import FEATURE_REPO_DIR, GNN_ARTIFACT_DIR, XGB_ARTIFACT_DIR
 from src.common.model_registry import serving_model_version
@@ -103,8 +104,8 @@ class FraudScorer:
             version = serving_model_version(client, self.model_name, self.model_version)
         else:
             version = serving_model_version(client, self.model_name)
-        uri = f"models:/{self.model_name}/{version.version}"
-        model = mlflow.xgboost.load_model(uri)
+        model_path = Path(client.download_artifacts(version.run_id, "model/model.xgb"))
+        model = self._load_booster(model_path)
         threshold_path = Path(client.download_artifacts(version.run_id, "model/serving_threshold.json"))
         feature_path = Path(client.download_artifacts(version.run_id, "model/feature_list.json"))
         return (
@@ -113,13 +114,20 @@ class FraudScorer:
             json.loads(threshold_path.read_text(encoding="utf-8")),
         )
 
+    @staticmethod
+    def _load_booster(model_path: Path) -> Booster:
+        """Load the native XGBoost model without MLflow's sklearn wrapper."""
+        booster = Booster()
+        booster.load_model(str(model_path))
+        return booster
+
     def _ensure_ready(self) -> None:
         if self.model is None or self.feature_list is None or self.threshold is None:
             if self.model_source == "registry":
                 self.model, self.feature_list, self.threshold = self._load_registry_artifacts()
             else:
                 model_dir = self.artifact_dir / "model"
-                self.model = mlflow.xgboost.load_model(str(model_dir))
+                self.model = self._load_booster(model_dir / "model.xgb")
                 threshold_path = self.artifact_dir / "threshold.json"
                 feature_path = self.artifact_dir / "feature_list.json"
                 self.threshold = json.loads(threshold_path.read_text(encoding="utf-8"))
@@ -161,7 +169,7 @@ class FraudScorer:
         if hasattr(self.model, "predict_proba"):
             score = float(self.model.predict_proba(row)[0, 1])
         else:
-            score = float(np.asarray(self.model.predict(row)).reshape(-1)[0])
+            score = float(np.asarray(self.model.predict(DMatrix(row, feature_names=self.feature_list))).reshape(-1)[0])
         gnn_score = self.gnn_scores.get(int(transaction_id))
         final_score = score
         cutoff = float(self.threshold["threshold"])
@@ -198,7 +206,8 @@ class FraudScorer:
         values = self._online_feature_values(online, self.feature_list)
         row = pd.DataFrame([[values[name] for name in self.feature_list]], columns=self.feature_list)
         row = row.apply(pd.to_numeric, errors="coerce").astype(np.float64)
-        contributions = self.model.get_booster().predict(
+        booster = self.model.get_booster() if hasattr(self.model, "get_booster") else self.model
+        contributions = booster.predict(
             DMatrix(row, feature_names=self.feature_list), pred_contribs=True
         )[0]
         ranked = sorted(
