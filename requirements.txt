@@ -1,0 +1,17 @@
+numpy==1.26.4
+pandas==2.2.3
+pillow==11.0.0
+pydicom==3.0.1
+scikit-learn==1.5.2
+matplotlib==3.9.2
+torch==2.5.1
+torchvision==0.20.1
+monai==1.4.0
+grad-cam==1.5.5
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+SQLAlchemy==2.0.36
+python-multipart==0.0.18
+dvc==3.59.0
+pytest==8.3.3
+httpx==0.27.2

@@ -1,0 +1,8 @@
+.venv/
+AIML-02/data/raw/
+AIML-02/data/processed/
+node_modules/
+*.pt
+*.pth
+.env
+__pycache__/
