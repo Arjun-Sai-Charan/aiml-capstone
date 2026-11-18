@@ -1,7 +1,7 @@
 FROM node:24-alpine AS build
 WORKDIR /app
-COPY AIML-02/viewer/package.json ./
-RUN npm install
+COPY AIML-02/viewer/package.json AIML-02/viewer/package-lock.json ./
+RUN npm ci
 COPY AIML-02/viewer ./
 RUN npm run build
 FROM nginx:alpine

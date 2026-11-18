@@ -10,4 +10,7 @@
 - Redirect DVC's site cache into `.dvc-home/` because the default `C:\ProgramData\iterative` location is not writable here; keep the processed-data DVC remote local under the ignored data directory.
 - Build the requested balanced 3,000-image subset and commit only ten small sample DICOMs; raw images and processed files remain uncommitted.
 - Keep the actual CPU smoke metrics and synthetic segmentation Dice in docs, labeled as limited smoke/demo evidence. Do not present them as generalizable performance.
-- Leave full Docker runtime and Vite build marked PENDING: the Docker daemon was absent and Windows could not execute npm's installed esbuild binary.
+- Upgrade the viewer from Vite 6 to Vite 8 and the official React plugin 6 after the esbuild Windows executable was truncated; Vite 8 build and dev checks now pass. Place Vite cache outside `node_modules` for this restricted Windows setup.
+- Use three segmentation outputs for background plus MSD hippocampal labels 1 and 2.
+- Guarantee the sampled negative subset is split evenly between `Normal` and `No Lung Opacity / Not Normal`; expose the class in the manifest and record per-split counts.
+- Leave Docker runtime marked PENDING because the Docker daemon is unavailable.

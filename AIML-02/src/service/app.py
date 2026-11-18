@@ -25,7 +25,7 @@ def classify_image(a):
   from torchvision.models import efficientnet_b0
   model=efficientnet_b0(weights=None);model.classifier[1]=torch.nn.Linear(model.classifier[1].in_features,2);ck=torch.load(model_file,map_location='cpu',weights_only=False);model.load_state_dict(ck['state_dict']);model.eval();tensor=torch.from_numpy(np.repeat(a[None,None],3,axis=1)).float(); tensor=(tensor-torch.tensor([.485,.456,.406])[None,:,None,None])/torch.tensor([.229,.224,.225])[None,:,None,None]
   with torch.no_grad(): probs=model(tensor).softmax(1)[0].numpy()
-  pred='pneumonia' if int(probs.argmax())==1 else 'no pneumonia'; confidence=float(probs.max()); version='efficientnet-b0-trained'
+  pred='pneumonia' if int(probs.argmax())==1 else 'no pneumonia'; confidence=float(probs.max()); version=f"efficientnet-b0-{ck.get('init','unknown').lower()}"
   try:
    from pytorch_grad_cam import GradCAM
    from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
@@ -49,7 +49,7 @@ def study(sid):
 def file_response(sid,attr):
  d=Session();s=d.get(Study,sid);d.close();
  if not s:raise HTTPException(404,'Study not found')
- p=Path(getattr(s,attr));return Response(p.read_bytes(),media_type='image/png' if p.suffix=='.png' else 'image/jpeg')
+ p=Path(getattr(s,attr)); suffix=p.suffix.lower(); mime='image/png' if suffix=='.png' else 'image/jpeg' if suffix in ('.jpg','.jpeg') else 'application/octet-stream';return Response(p.read_bytes(),media_type=mime)
 @app.get('/studies/{sid}/image')
 def image(sid):return file_response(sid,'image_path')
 @app.get('/studies/{sid}/heatmap')
@@ -67,9 +67,14 @@ def audit():
 async def upload(file:UploadFile=File(...)):
  data=await file.read()
  if not data:raise HTTPException(400,'Empty upload')
- try:Image.open(io.BytesIO(data)).verify()
- except Exception:raise HTTPException(400,'Upload must be a readable image (PNG/JPEG)')
- return serialize(create_study(data,file.filename or 'upload.png'))
+ try:
+  source=Image.open(io.BytesIO(data)); image_format=source.format
+  if image_format not in ('PNG','JPEG'):raise HTTPException(415,'Upload must be PNG or JPEG')
+  source.verify()
+ except HTTPException:raise
+ except Exception as exc:raise HTTPException(400,'Upload must be a readable PNG or JPEG') from exc
+ suffix='.png' if image_format=='PNG' else '.jpg'; supplied=Path(file.filename or 'upload').name; name=Path(supplied).stem+suffix
+ return serialize(create_study(data,name))
 
 # Optional Orthanc polling. Local upload remains fully independent of Orthanc.
 def _poll_orthanc():
@@ -87,9 +92,10 @@ def _poll_orthanc():
     if oid in seen:continue
     raw=fetch(f'/instances/{oid}/file')
     import pydicom
-    ds=pydicom.dcmread(io.BytesIO(raw)); arr=ds.pixel_array.astype(np.float32)
-    if getattr(ds,'PhotometricInterpretation','')=='MONOCHROME1':arr=arr.max()-arr
-    arr=(arr-arr.min())/max(float(arr.max()-arr.min()),1e-6); buf=io.BytesIO();Image.fromarray(np.uint8(arr*255)).save(buf,format='PNG'); create_study(buf.getvalue(),f'orthanc-{oid}.png');seen.add(oid)
+    ds=pydicom.dcmread(io.BytesIO(raw))
+    from src.data.build_dataset import process_array
+    arr=process_array(ds.pixel_array,getattr(ds,'PhotometricInterpretation','')=='MONOCHROME1',getattr(ds,'RescaleSlope',1),getattr(ds,'RescaleIntercept',0),getattr(ds,'WindowCenter',None),getattr(ds,'WindowWidth',None))
+    buf=io.BytesIO();Image.fromarray(arr).save(buf,format='PNG'); create_study(buf.getvalue(),f'orthanc-{oid}.png');seen.add(oid)
   except Exception as e: print(f'Orthanc polling unavailable: {e}')
   time.sleep(15)
 @app.on_event('startup')

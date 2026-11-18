@@ -6,6 +6,10 @@ def test_health_upload_review_audit():
 
     client = TestClient(app)
     assert client.get('/health').json()['education_only'] is True
+    assert client.post('/upload', files={'file': ('bad.png', b'not an image', 'image/png')}).status_code == 400
+    gif = io.BytesIO()
+    Image.new('L', (8, 8), 0).save(gif, format='GIF')
+    assert client.post('/upload', files={'file': ('bad.gif', gif.getvalue(), 'image/gif')}).status_code == 415
     image = io.BytesIO()
     Image.new('L', (32, 32), 100).save(image, format='PNG')
     response = client.post('/upload', files={'file': ('x.png', image.getvalue(), 'image/png')})

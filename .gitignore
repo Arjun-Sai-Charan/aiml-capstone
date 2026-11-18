@@ -13,3 +13,8 @@ AIML-02/viewer/dist/
 .dvc-home/
 AIML-02/data/dvc_storage/
 .pytest_cache/
+
+.npm-cache/
+.viewer-validation/
+
+.vite-cache/

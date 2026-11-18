@@ -66,12 +66,12 @@ To use Orthanc samples, start Docker services, then run `python -m src.service.p
 
 | Work item | Result |
 |---|---|
-| RSNA data build | Complete: 3,000 images; 2,100 train, 450 validation, 450 test; each split class balanced. Compressed NPZ: 110,278,764 bytes. See [dataset counts](AIML-02/docs/DATASET_STATS.md). |
-| Classification smoke | One epoch, 32 rows, 5-row test subset: accuracy 0.40, AUC 0.50, precision 0.40, recall 1.00, F1 0.57; random initialization. This only confirms the code path runs and is not a meaningful performance estimate. Full run: **PENDING - run `python run.py train-cls -- --epochs 3`**. |
-| Grad-CAM | 10 overlays generated locally from the smoke checkpoint. |
-| Segmentation demo | Synthetic one-epoch training; illustrative first-batch Dice 0.0742, not held-out performance. |
+| RSNA data build | Complete: 3,000 images; 2,100 train, 450 validation, 450 test; each split class balanced. Compressed NPZ: 110,357,019 bytes. See [dataset counts](AIML-02/docs/DATASET_STATS.md). |
+| Historical classification smoke | Earlier data variant: 1 epoch, 32 rows, 5-row test subset; accuracy 0.40, AUC 0.50, precision 0.40, recall 1.00, F1 0.57; random initialization. It does not describe the current dataset. Full run: **PENDING - run `python run.py train-cls -- --epochs 3`**. |
+| Grad-CAM | 10 overlays generated locally from the earlier smoke checkpoint. |
+| Segmentation demo | Synthetic one-epoch training; illustrative first-batch Dice 0.0367 on synthetic data, not held-out performance. |
 | Automated tests | 4 passed, 17 upstream deprecation warnings in 15.90s. See [test output summary](AIML-02/docs/TEST_RESULTS.md). |
-| Viewer production build | **PENDING - run `npm install` and `npm run build` in `AIML-02/viewer`**. This Windows environment could not execute npm's downloaded esbuild binary (`EFTYPE`). |
+| Viewer production build | Verified with Vite 8.3.8; `npm install`, `npm run build`, and dev server HTTP checks passed. |
 | Docker runtime | Compose config validated; **PENDING - run `docker compose -f AIML-02/docker/docker-compose.yml up --build`** when Docker daemon is available. |
 
 ## Screenshots
@@ -80,7 +80,7 @@ Placeholder: capture the study list, selected scan with heatmap overlay, review 
 
 ## Limitations
 
-The balanced subset does not represent real-world disease prevalence. Dataset population and scanner coverage may not generalize; labels are noisy proxies, and bounding boxes are not localization ground truth. Image artifacts and acquisition differences can influence output. The smoke classification metrics use only five test images; the segmentation Dice is from synthetic training data. The local fallback is a simple image statistic if no checkpoint exists. No output supports clinical use.
+The balanced subset does not represent real-world disease prevalence. Dataset population and scanner coverage may not generalize; labels are noisy proxies, and bounding boxes are not localization ground truth. Image artifacts and acquisition differences can influence output. The historical smoke classification metrics use five test images from the earlier sample variant and do not describe the rebuilt dataset; the segmentation Dice is from synthetic training data. The local fallback is a simple image statistic if no checkpoint exists. No output supports clinical use.
 
 ## Project documents
 
