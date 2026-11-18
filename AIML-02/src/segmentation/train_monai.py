@@ -27,5 +27,12 @@ def main():
   for batch in dl:
    x=batch['image'].to(device).float();y=batch['label'].to(device).long();opt.zero_grad();pred=model(x);loss=loss_fn(pred,y);loss.backward();opt.step();vals.append(loss.item())
   print('epoch',ep+1,'dice_loss',float(np.mean(vals)))
- out=Path(a.output);out.mkdir(parents=True,exist_ok=True); torch.save(model.state_dict(),out/'unet.pt'); metrics={'demo':demo,'epochs':a.epochs,'device':device,'dice_score':None,'note':'Held-out validation Dice not computed yet; train only.'};(out/'metrics.json').write_text(json.dumps(metrics,indent=2));print(metrics)
+ model.eval(); batch=next(iter(dl)); vx=batch['image'].to(device).float(); vy=batch['label'].to(device).long()
+ with torch.no_grad(): logits=sliding_window_inference(vx,(32,32,32),1,model); pred=logits.argmax(1); target=vy[:,0] if vy.ndim==5 else vy; inter=((pred==1)&(target==1)).sum().item(); denom=(pred==1).sum().item()+(target==1).sum().item(); dice=float(2*inter/max(denom,1))
+ out=Path(a.output);out.mkdir(parents=True,exist_ok=True); torch.save(model.state_dict(),out/'unet.pt')
+ import matplotlib
+ matplotlib.use("Agg")
+ import matplotlib.pyplot as plt
+ im=vx[0,0].detach().cpu().numpy(); mask=pred[0].detach().cpu().numpy(); z=im.shape[-1]//2; fig,ax=plt.subplots();ax.imshow(im[:,:,z],cmap='gray');ax.imshow(np.ma.masked_where(mask[:,:,z]==0,mask[:,:,z]),alpha=.4,cmap='autumn');fig.savefig(out/'slice_overlay.png');plt.close(fig)
+ metrics={'demo':demo,'epochs':a.epochs,'device':device,'dice_score':dice,'score_split':'first training batch (illustrative, not held-out)'};(out/'metrics.json').write_text(json.dumps(metrics,indent=2));print(metrics)
 if __name__=='__main__':main()

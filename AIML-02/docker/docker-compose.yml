@@ -1,0 +1,23 @@
+services:
+  orthanc:
+    image: orthancteam/orthanc:latest
+    ports: ["8042:8042", "4242:4242"]
+    environment:
+      ORTHANC__REGISTERED_USERS: "{\"demo\":\"demo\"}"
+  service:
+    build:
+      context: ../..
+      dockerfile: AIML-02/docker/Dockerfile.service
+    ports: ["8000:8000"]
+    volumes: ["../data/local:/app/AIML-02/data/local"]
+    environment:
+      ORTHANC_URL: http://orthanc:8042
+      ORTHANC_USERNAME: demo
+      ORTHANC_PASSWORD: demo
+    depends_on: [orthanc]
+  viewer:
+    build:
+      context: ../..
+      dockerfile: AIML-02/docker/Dockerfile.viewer
+    ports: ["8080:80"]
+    depends_on: [service]

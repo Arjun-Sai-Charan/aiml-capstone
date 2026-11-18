@@ -6,3 +6,10 @@ node_modules/
 *.pth
 .env
 __pycache__/
+AIML-02/data/local/
+AIML-02/outputs/
+AIML-02/models/
+AIML-02/viewer/dist/
+.dvc-home/
+AIML-02/data/dvc_storage/
+.pytest_cache/
