@@ -1,0 +1,9 @@
+{
+  "transactions": 5000,
+  "latency_scope": "Feast online lookup plus model inference; excludes Kafka and model startup",
+  "p50_ms": 26.279236997652333,
+  "p95_ms": 52.13906124263303,
+  "p99_ms": 74.35702813847459,
+  "throughput_transactions_per_second": 33.01382957168842,
+  "elapsed_seconds": 151.45168145799835
+}

@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drift-check
+  namespace: fraud
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+          containers:
+            - name: drift-and-dry-run
+              image: fraud-jobs:phase8
+              imagePullPolicy: Never
+              command: ["/bin/sh", "-c"]
+              args:
+                - python -m src.monitoring.drift && python -m src.monitoring.retrain --dry-run --tracking-uri "$MLFLOW_TRACKING_URI"
+              envFrom:
+                - configMapRef:
+                    name: fraud-settings
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 768Mi
