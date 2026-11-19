@@ -39,9 +39,12 @@ Use Python 3.12 in the repository `.venv`. No data are downloaded. The local RSN
 Windows PowerShell:
 
 ```powershell
+py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe run.py data
 ```
+
+The RSNA raw files are not included in Git. Before `run.py data`, provision `AIML-02/data/raw/rsna/` or set `RSNA_DIR` to the local dataset. The trained `classifier.pt` and matching `metrics.json` are also not committed; copy them to `AIML-02/models/` on a clean checkout.
 
 Linux/Colab: activate the root `.venv` (or use `.venv/bin/python`) and run `python run.py <task>` from the repository root.
 
@@ -63,17 +66,18 @@ Linux/Colab: activate the root `.venv` (or use `.venv/bin/python`) and run `pyth
 - Start the React viewer in a second terminal: `cd AIML-02/viewer; npm install; npm run dev`
 - Validate Docker services: `docker compose -f AIML-02/docker/docker-compose.yml up --build`
 
-The classifier loader defaults to `AIML-02/models/classifier.pt`. After GPU training in Colab/Kaggle, download the generated `classifier.pt` from the training output directory and place it at `AIML-02/models/classifier.pt` (create the `models` folder if needed). Place its adjacent `metrics.json` in the same folder so the viewer can show the model version. Alternatively set `MODEL_PATH` to the checkpoint path before starting the service. Check that it loads with `python run.py check-model`. Without it, the UI shows a DEMO warning. To load the bundled DICOM scans, start the API with `python run.py serve`, open another terminal at the repository root, and run `python run.py load-samples`.
+The classifier loader defaults to `AIML-02/models/classifier.pt`. A trained checkpoint is currently present in the local workspace; model files are ignored by Git, so copy `classifier.pt` and its adjacent `metrics.json` into `AIML-02/models/` on any other checkout. To train again in Colab/Kaggle, upload `AIML-02/data/processed/dataset.npz`, run `python run.py train-cls -- --epochs 3`, then download both files from the training output directory. Check the installed model with `python run.py check-model`. Without a checkpoint, the UI shows a DEMO warning. To load the bundled DICOM scans, start the API with `python run.py serve`, open another terminal at the repository root, and run `python run.py load-samples`.
 
 ## Results
 
 | Work item | Result |
 |---|---|
 | RSNA data build | Complete: 3,000 images; 2,100 train, 450 validation, 450 test; each split class balanced. Compressed NPZ: 110,357,019 bytes. See [dataset counts](AIML-02/docs/DATASET_STATS.md). |
-| Historical classification smoke | Earlier data variant: 1 epoch, 32 rows, 5-row test subset; accuracy 0.40, AUC 0.50, precision 0.40, recall 1.00, F1 0.57; random initialization. It does not describe the current dataset. Full run: **PENDING - run `python run.py train-cls -- --epochs 3`**. |
-| Grad-CAM | 10 overlays generated locally from the earlier smoke checkpoint. |
-| Segmentation demo | Synthetic one-epoch training; illustrative first-batch Dice 0.0367 on synthetic data, not held-out performance. |
-| Automated tests | 4 passed, 3 upstream deprecation warnings in 11.70s. See [test output summary](AIML-02/docs/TEST_RESULTS.md). |
+| Current classifier | Stored metrics: 450 held-out test images; accuracy 0.7978, AUC 0.8843, precision 0.8018, recall 0.7911, F1 0.7964; confusion matrix `[[181, 44], [47, 178]]`; `demo:false`, ImageNet weights. The metrics file reports `device: cpu`; Colab GPU provenance should be reconciled before claiming GPU training. |
+| Historical classification smoke | Earlier data variant: 1 epoch, 32 rows, 5-row test subset; accuracy 0.40, AUC 0.50, precision 0.40, recall 1.00, F1 0.57; random initialization. Retained as historical evidence only. |
+| Grad-CAM | API reports aligned heatmaps targeting the predicted class for the 10 current studies; alignment and argmax-target regression tests pass. |
+| Segmentation demo | MSD Task04_Hippocampus is absent. One-epoch synthetic training produced illustrative training-batch Dice 0.0367; this is not real-image or held-out performance. |
+| Automated tests | 6 passed, 7 upstream deprecation warnings in 10.85s. See [test output summary](AIML-02/docs/TEST_RESULTS.md). |
 | Viewer production build | Verified with Vite 8.3.8; `npm install`, `npm run build`, and dev server HTTP checks passed. |
 | Docker runtime | Compose config validated; **PENDING - run `docker compose -f AIML-02/docker/docker-compose.yml up --build`** when Docker daemon is available. |
 
@@ -83,7 +87,7 @@ Placeholder: capture the study list, selected scan with heatmap overlay, review 
 
 ## Limitations
 
-The balanced subset does not represent real-world disease prevalence. Dataset population and scanner coverage may not generalize; labels are noisy proxies, and bounding boxes are not localization ground truth. Image artifacts and acquisition differences can influence output. The historical smoke classification metrics use five test images from the earlier sample variant and do not describe the rebuilt dataset; the segmentation Dice is from synthetic training data. Without a checkpoint, the service runs in DEMO mode with neutral placeholder values and displays a warning; those values are not predictions. No output supports clinical use.
+The balanced subset does not represent real-world disease prevalence. Dataset population and scanner coverage may not generalize; labels are noisy proxies, and bounding boxes are not localization ground truth. Image artifacts and acquisition differences can influence output. The current classifier metrics are from one held-out split of this balanced RSNA subset and are not external validation. The older five-case smoke metrics do not describe the current model. Segmentation remains demo-only because MSD Task04_Hippocampus is absent: its synthetic volumes and hard-coded labels are only a pipeline check, and the reported Dice is from a training batch, not a validation set. Without a checkpoint, the service runs in DEMO mode with neutral placeholder values and displays a warning; those values are not predictions. No output supports clinical use.
 
 ## Project documents
 

@@ -1,98 +1,47 @@
-﻿# AIML-02 Audit Report
+# Project audit report
 
-Audit date: 2026-11-19. Current branch: `master`. The report was prepared without modifying project code, configuration, or data. Docker/Orthanc are **DESCOPED** under the current scope.
+Audit date: 2026-11-19. Checks used current repository files, local artifacts, executed commands, HTTP responses, and the actual pytest run. Docker and Orthanc were left untouched per the current scope. The untracked `aiml_colab.zip` was not read, modified, staged, or committed.
 
-## Verification performed
+## Verified status
 
-### Test suite
+- `python run.py test -- --tb=short`: **6 passed, 7 warnings in 10.85s**. Warnings are FastAPI lifecycle and Starlette/AnyIO deprecations.
+- `python run.py check-model`: loaded the local checkpoint in real mode. Output included model version `efficientnet-b0-imagenet`, prediction `pneumonia`, confidence and pneumonia probability both `0.9606103897094727` for the bundled sample.
+- Live `GET /health`: `model_loaded:true`, `model_version:"efficientnet-b0-imagenet"`, `mode:"real"`.
+- Live `GET /studies`: 10 studies returned. Viewer root at `http://127.0.0.1:5173/` returned HTTP 200.
+- Current classifier metrics file reports `demo:false`, ImageNet weights, `test_n:450`, accuracy 0.7977778, AUC 0.8843062, precision 0.8018018, recall 0.7911111, F1 0.7964206, confusion matrix `[[181,44],[47,178]]`, and `device:"cpu"`.
+- Segmentation dataset `AIML-02/data/raw/msd/Task04_Hippocampus` is absent. The stored segmentation metrics say `demo:true`; Dice 0.0366846 is a synthetic training-batch score, not real-MRI or held-out performance.
+- Pytest uses temporary DB/data directories in its fixtures; the dev DB inspected after tests contained 10 studies and 0 audit rows. Tests did not add test rows to the dev DB.
+- `AIML-02/models/classifier.pt` exists locally but is ignored by Git. The user's statement that training used a Colab GPU is not corroborated by the matching metrics artifact, which says CPU; verify provenance before claiming this checkpoint's metrics came from GPU training.
 
-Command: `PYTHONDONTWRITEBYTECODE=1`, `PYTEST_ADDOPTS=-p no:cacheprovider`, then `.\.venv\Scripts\python.exe run.py test`.
+## Findings
 
-Observed result:
-
-```text
-collected 4 items
-AIML-02\tests\test_api.py .
-AIML-02\tests\test_pipeline.py ...
-======================= 4 passed, 3 warnings in 10.98s =======================
-```
-
-Warnings are upstream Starlette/AnyIO and FastAPI `on_event` lifecycle deprecations. `AIML-02/tests/conftest.py:9-21` sets `DATA_DIR`, `DATABASE_URL`, and `MODEL_PATH` to a fresh `.test-tmp` directory for each test and removes it afterward. Before/after the run, the live dev DB remained at 10 studies and 0 audit rows; tests did not add rows to it. Test suite breadth is small: three pipeline tests and one API test function (which has several assertions).
-
-### Model check and live API
-
-`python run.py check-model` output:
-
-```text
-{'sample': '149d826e-7078-4b2c-888a-d8811c72caf8.dcm', 'mode': 'demo', 'model_version': 'DEMO', 'prediction': 'no pneumonia', 'confidence': 0.5, 'pneumonia_probability': 0.5}
-```
-
-The configured default `AIML-02/models/classifier.pt` does not exist. This is the DEMO branch, not model inference.
-
-Live HTTP checks against `http://127.0.0.1:8000` returned:
-
-- `GET /health`: HTTP 200, `model_loaded:false`, `model_version:"DEMO"`, `mode:"demo"`, `education_only:true`.
-- `GET /studies`: HTTP 200 with 10 studies. All observed rows are DEMO predictions with placeholder confidence/probability 0.5.
-
-An additional temporary-database TestClient check returned health 200, empty studies 200, PNG upload 200, and review 200 with status `approved`. The resulting audit record contained `who:"audit-check"`, `what:"approve"`, a timestamp, model version `DEMO`, confidence 0.5, pneumonia probability 0.5 and the supplied comment. The temporary database and image directory were removed after the check. A multipart parser warning (`Skipping data after last boundary`) was logged, but the request succeeded.
-
-### Data, DVC, model and environment checks
-
-- Read `AIML-02/data/processed/manifest.csv`: 3,000 records, 3,000 unique patient IDs; split sizes train 2,100 / val 450 / test 450; each split is balanced 50/50 by label. Grouping `Target.max()` by `patientId` occurs before splitting in `AIML-02/src/data/build_dataset.py:60-78`.
-- `AIML-02/src/classification/train.py:31,41-50` uses the stored split labels, selects model checkpoints by validation loss and traverses the held-out test indices once after training. No patient overlap exists in the processed manifest. A quick `--max-samples` run is not full evaluation evidence.
-- `AIML-02/src/data/build_dataset.py:7-16,22-23` applies MONOCHROME1 inversion, rescale slope/intercept, DICOM windowing or 1st/99th percentile clipping, normalization and resize.
-- Current classifier metrics file exactly records `test_n:5`, accuracy 0.4, AUC 0.5, precision 0.4, recall 1.0, F1 0.571428..., confusion matrix `[[0,3],[0,2]]`, CPU and random initialization. README/MODEL_CARD call these historical smoke metrics. The figures match the artifact, but the artifact has no dataset fingerprint or run timestamp; they should remain explicitly historical and not be described as full-model performance.
-- Current segmentation metrics file says `demo:true`, `epochs:1`, CPU, Dice `0.036684606904662354`, with per-label values and `score_split` explicitly “training batch (illustrative, not held-out)”. MSD Task04 is absent. This is demo evidence, not real-data validation.
-- `AIML-02/models/classifier.pt` is absent. `AIML-02/models/best.pt` is an ignored 16,314,334-byte local smoke checkpoint. No `.pt`/`.pth` weights are tracked in Git history.
-- `AIML-02/data/processed.dvc` is tracked and `python -m dvc status` returned `Data and pipelines are up to date.` The configured remote is a local path, so this does not establish availability to a clean clone.
-- `python -m pip check` returned `No broken requirements found.` Direct entries in `requirements.txt` are pinned. This checks the current venv, not a fresh install from the Internet.
-- Git has eight readable implementation/fix commits before this report; `git remote -v` returned no output. Ten intentionally committed sample DICOMs total 1,404,272 bytes (largest 164,688 bytes). No model weights, raw RSNA tree, processed arrays, or oversized artifacts are tracked. `.gitignore` covers raw/processed data, `.pt`, `.pth`, `.env`, local outputs and SQLite data. Targeted scans found no committed absolute user paths or API/cloud secrets.
-- Root README and AIML-02 README contain the exact education-only notice; the viewer header is persistent and the API/docs description contains it. `npm`/browser build artifacts were not regenerated during this no-change audit; the live Vite page returned HTTP 200.
-
-### Honesty review of reported numbers and claims
-
-- The current processed row count, patient uniqueness, split sizes, and NPZ byte size were checked directly and match the documented values.
-- Classifier accuracy/AUC/precision/recall/F1/confusion numbers match the on-disk `metrics.json`, which has `test_n:5`, `weights:"random"`, and `demo:false`. The report is labeled historical/smoke in README and MODEL_CARD. The stated prior command and `--max-samples 32` are not recorded in the metrics artifact, so that run-command provenance cannot be independently confirmed from this checkout; this is a traceability gap, not evidence that the metrics were fabricated.
-- Segmentation Dice and per-label values match the on-disk metrics file; that file says `demo:true` and `score_split:"training batch (illustrative, not held-out)`. The README/MODEL_CARD do not present this as real MSD or held-out performance.
-- The documented ten Grad-CAM overlays exist in the output directory. The documented latest test duration is stale: the fresh run here was 10.98 seconds, not the previously documented 11.70 seconds.
-- Docker/Orthanc runtime claims were not rerun because those items are DESCOPED. Their existing “PENDING” text should be changed to “DESCOPED,” not treated as a failed or missing milestone.
-
-## Correctness and security findings
-
-Finding count: **3 High, 6 Medium, 3 Low**.
-
-| Severity | Finding and location | Evidence / suggested fix |
+| Severity | Finding and location | Suggested fix |
 |---|---|---|
-| High | No final default classifier. `AIML-02/src/service/app.py:31,75-91`; README model instructions at `README.md:66`. | The health endpoint and `check-model` both report DEMO; only an ignored smoke `best.pt` exists. Train the full 3,000-image split in Colab, then place `classifier.pt` and matching `metrics.json` at the documented path. Re-run check-model and health before presenting predictions. |
-| High | Local API is network-exposed with wildcard CORS and no authentication. `AIML-02/src/service/app.py:63,69-72,223-253`; `run.py:16`. | Service binds `0.0.0.0`, accepts any CORS origin, and accepts a caller-supplied reviewer identity. For a local-only demo bind loopback and restrict origins; before any use with sensitive images add authentication/authorization and trusted reviewer identity. |
-| High | Clean-clone setup does not create `.venv` or provision ignored datasets. `README.md:37-46,50-63`; `.gitignore:2-3`. | README's Windows pip command fails if `.venv` is absent; `python run.py data` fails without the ignored RSNA data; generic `python` may select an unintended interpreter. Document `py -3.12 -m venv .venv`, use `\.venv\Scripts\python.exe` for Windows tasks, and explain RSNA/MSD/processed-data provisioning. |
-| Medium | Upload reads arbitrary request bodies fully into memory, with no byte limit. `AIML-02/src/service/app.py:256-277`. | A large PNG/JPEG/DICOM can exhaust service memory. Enforce a request/file size limit while streaming and reject oversized uploads before decoding. |
-| Medium | DVC remote is machine-local. `.dvc/config:1-3`, `AIML-02/data/processed.dvc`. | Current DVC status is clean locally, but the configured path `../AIML-02/data/dvc_storage` is ignored/local and cannot support a fresh clone. Configure a shared remote and verify pull from a separate checkout. |
-| Medium | Grad-CAM errors silently produce a non-CAM image. `AIML-02/src/service/app.py:130-139`. | `heatmap` starts as the input image and exceptions are swallowed; the route/viewer can then present intensity from the scan as though it were Grad-CAM. Return an explicit unavailable/error state instead of a fallback masquerading as a heatmap. |
-| Medium | Audit is append-only through current HTTP routes, not immutable at the database layer. `AIML-02/src/service/app.py:48-58,223-253`. | Code inserts audit events and exposes no update/delete route, but SQLite rows can be updated/deleted directly and no immutable trigger/WORM storage exists. If “truly append-only” is required, enforce immutability at the database/storage layer. |
-| Medium | Existing docs still present Docker/Orthanc work as in-scope or PENDING. `README.md:13,25,64,78`; `AIML-02/docs/architecture.md:7,28`; `AIML-02/docs/PRESENTATION.md:8`; `AIML-02/docs/TEST_RESULTS.md:35,39`. | These references contradict the current scope. Mark them DESCOPED or remove them in a later documentation-only cleanup; do not run Docker/Orthanc. |
-| Medium | There is no GitHub remote configured. `git remote -v` produced no output. | Local history is readable, but a GitHub repository/push is not evidenced. Configure and push to the submission repository if required. |
-| Low | Latest documented test timing is stale. `README.md:76`; `AIML-02/docs/TEST_RESULTS.md:9`. | Existing docs record 11.70s; this audit's fresh run was 10.98s. Both are real runs, but the “final run” wording should be updated to the latest result. |
-| Low | Automated tests do not exercise the model-file loader or segmentation training/inference path. `AIML-02/tests/test_api.py:1`; `AIML-02/tests/test_pipeline.py:3,8,11`. | The current suite covers preprocessing, a model forward pass, Grad-CAM utility shape, and API review flow. Add targeted model checkpoint and segmentation tests when implementation work is allowed. |
-| Low | Presentation separators are visibly corrupted. `AIML-02/docs/PRESENTATION.md:3-11`. | Time ranges and separators render as `?`; replace them with ASCII `-`/`|` and use the same readable form in the submitted slides. |
+| High | README clean-clone setup (`README.md:37-49`) now creates a venv but requires external RSNA files for `python run.py data`; raw data are not part of Git. | Make the first-run path explicit: provide the processed archive/data separately, or explain that the data task requires the local RSNA dataset. |
+| High | Service is a local educational demo with permissive CORS and no authentication (`AIML-02/src/service/app.py:64,273-296`). | Keep it bound to localhost for the demo; add authentication and restrict CORS before exposing it to a network. |
+| Medium | Classifier provenance mismatch: `AIML-02/models/metrics.json` says `device:"cpu"`, although the user reports Colab GPU training. | Match the checkpoint with its original Colab metrics/logs or rerun training and preserve the paired artifacts. |
+| Medium | Segmentation is synthetic-only (`AIML-02/src/segmentation/train_monai.py`; `AIML-02/outputs/segmentation/metrics.json` says `demo:true`). | Keep results labeled demo-only; use MSD Task04 with a held-out split before making real segmentation performance claims. |
+| Medium | Upload endpoint accepts user files (`AIML-02/src/service/app.py`, `/upload` route); review size/type handling before any non-local use. | Enforce byte limits, validate decoded formats, and use generated storage names outside the web root. |
+| Medium | CORS behavior is permissive for development (`AIML-02/src/service/app.py:64`). | Restrict allowed origins to the local viewer origin for a local run. |
+| Medium | Audit append-only behavior is implemented through service routes, not a database-level immutable constraint (`AIML-02/src/service/app.py:49-60,225-260`). | Add database-level protections or document that direct DB access can alter audit rows. |
+| Medium | DVC data remote is local and machine-dependent (`.dvc/config`). | Configure a shared remote only if data sharing is authorized; keep sensitive/raw data out of Git. |
+| Low | Test coverage does not prove a real checkpoint's metrics provenance or real-data segmentation quality (`AIML-02/tests/`). | Add loader/provenance tests and segmentation tests when real data are available. |
+| Low | GitHub publication cannot be confirmed when no Git remote is configured (`git remote -v` was empty at audit time). | Add the intended remote and push only approved source/docs; keep ignored weights and data out. |
 
-No inconsistency was found between `confidence` and `pneumonia_probability`: backend `AIML-02/src/service/app.py:121-140` returns the predicted-class probability as confidence and class-1 probability separately; the viewer displays both at `AIML-02/viewer/src/main.jsx:103-109`; the review endpoint copies both saved values into the audit event at `AIML-02/src/service/app.py:235-238`.
+The findings above are code/repository observations, not evidence of clinical safety. This audit did not inspect or validate patient-level clinical performance.
 
-No patient leakage was found in the processed manifest: patient IDs are unique across its 3,000 rows. Label aggregation occurs before patient-level stratified split. The training script evaluates the test indices only after all epochs; it evaluates validation loss each epoch for model selection.
+## Segmentation: why it remains demo-only
 
-## Scope and documentation cleanup
+The real MSD Hippocampus directory is missing. The demo path creates synthetic random volumes and artificial segmentation labels so the MONAI pipeline can execute. Its saved one-epoch Dice value is calculated on a training batch. It does not measure segmentation quality on MRI, and it is not a held-out score. To produce a real result, provide the dataset, set `MSD_DIR`, and run `python run.py train-seg -- --epochs 2` with a valid evaluation split.
 
-Every item below is **DESCOPED**; it is not missing work and must not be run for this submission scope. Existing references to update later:
+## Docker/Orthanc
 
-- `README.md:13,25,64,78` - Orthanc feature, architecture node, Docker task, Docker PENDING result.
-- `AIML-02/docs/architecture.md:7,28` - Orthanc diagram and Docker/Orthanc absent language.
-- `AIML-02/docs/PRESENTATION.md:8` - Orthanc agenda item.
-- `AIML-02/docs/TEST_RESULTS.md:35,39` - Docker heading and Docker PENDING outcome.
+No Docker/Orthanc actions were performed. Existing Docker references were intentionally left as-is at the user's direction.
 
-## Top five likely mark losses
+## Five items most likely to lose marks
 
-1. The default service is DEMO because the trained `classifier.pt` is absent; 0.5 values are placeholders.
-2. Classifier evidence is only a five-case historical smoke evaluation, not full held-out results for the current dataset.
-3. README setup does not create the venv or explain that raw data and the local DVC remote are absent from a clean clone.
-4. No GitHub remote is configured; the presentation is only an outline and the personal reflection is still blank.
-5. README/docs still describe Docker/Orthanc and Docker PENDING despite the explicit DESCOPED scope; presentation time separators are also corrupted.
+1. Segmentation has no real MSD experiment or held-out Dice result.
+2. The current checkpoint's metrics say CPU, which conflicts with the reported Colab GPU provenance unless the artifact pairing is verified.
+3. Reflection is still the student's responsibility and is not written.
+4. A presentation document is not itself proof of a delivered 10-minute presentation.
+5. GitHub publication/remote and clean-clone reproducibility are not confirmed; local data and weights are excluded from Git.

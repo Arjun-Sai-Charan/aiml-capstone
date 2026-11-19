@@ -1,38 +1,42 @@
-﻿# Test and run results
+# Test and run results
 
-Environment: Windows 11, Python 3.12.10 in the repository `.venv`; CPU execution.
+Environment: Windows, Python 3.12.10 in the repository `.venv`; CPU execution for the recorded test run.
 
 ## Automated tests
 
 Command: `python run.py test`
 
-Result: **6 passed, 7 warnings in 19.79s** on the current run. Warnings are upstream Starlette/AnyIO and FastAPI lifecycle deprecations. API checks cover isolated temporary storage, raster and DICOM upload, both probability fields, review audit values, and duplicate-review rejection.
+Current observed result: **6 passed, 7 warnings in 10.85s**. Warnings are upstream Starlette/AnyIO and FastAPI lifecycle deprecations. Tests cover temporary API storage, raster and DICOM upload, review/audit values, preprocessing, model forward pass, Grad-CAM utility shape, heatmap alignment, and predicted-class target selection.
 
 ## Dataset
 
 Command: `python run.py data`
 
-Completed using the local RSNA directory. The NPZ contains 3,000 uint8 images of shape 224x224, compressed size 110,357,019 bytes. The negative classes are explicitly balanced 50/50 within the negative subset; exact per-split mix is in the generated stats file. Counts: train 1,050 per class; validation 225 per class; test 225 per class. The generated [dataset statistics](DATASET_STATS.md) are from the real build.
+The processed NPZ currently contains 3,000 uint8 images of shape 224x224, compressed size 110,357,019 bytes. The manifest has 3,000 unique patient IDs: train 2,100, validation 450, test 450; each split has 1,050/225/225 samples per class. Negative-class mix is recorded in [dataset statistics](DATASET_STATS.md). These artifacts were inspected during the latest audit; the data build was not rerun in this documentation update.
 
-## Classification smoke run
+## Current classifier
 
-Command: `python run.py train-cls -- --epochs 1 --max-samples 32`
+The local `AIML-02/models/classifier.pt` exists. Running `python run.py check-model` loaded it and returned:
 
-The training and one held-out smoke evaluation ran on an earlier dataset sample variant: 5 test rows; accuracy 0.40, AUC 0.50, precision 0.40, recall 1.00, F1 0.5714; confusion matrix `[[0, 3], [0, 2]]`; CPU; random initialization because the Torch cache was inaccessible. Plotting initially failed when Matplotlib selected Tk; PNGs were later generated from recorded metrics without another test inference. The ROC PNG shows one observed threshold only, not a full curve. The processed dataset has since been rebuilt with explicit negative-class balance; these metrics do not describe the current dataset. Full classification: **PENDING - run `python run.py train-cls -- --epochs 3`**.
+```text
+{'sample': '149d826e-7078-4b2c-888a-d8811c72caf8.dcm', 'mode': 'real', 'model_version': 'efficientnet-b0-imagenet', 'prediction': 'pneumonia', 'confidence': 0.9606103897094727, 'pneumonia_probability': 0.9606103897094727}
+```
+
+The current metrics artifact records `AIML-02/models/metrics.json`: `demo:false`, `weights:"ImageNet"`, `device:"cpu"`, `test_n:450`, accuracy 0.7977777777777778, AUC 0.8843061728395062, precision 0.8018018018018018, recall 0.7911111111111111, F1 0.796420581655481, and confusion matrix `[[181, 44], [47, 178]]`.
+
+The user reports training with a Colab GPU, but this metrics artifact reports CPU. The repository does not record the training invocation or a checkpoint-to-metrics hash. Verify that the metrics file belongs to the submitted checkpoint before claiming GPU training. The checkpoint is ignored by Git and must be transferred separately to another checkout.
+
+## Historical classifier smoke run
+
+An earlier data variant smoke run evaluated 5 test rows: accuracy 0.40, AUC 0.50, precision 0.40, recall 1.00, F1 0.5714; confusion matrix `[[0, 3], [0, 2]]`; CPU and random initialization. These historical values do not describe the current classifier.
 
 ## Grad-CAM
 
-Command: `python run.py gradcam`
-
-Completed; 10 overlays were saved in the ignored `AIML-02/outputs/gradcam/` directory.
-
-Alignment verification: service preprocessing stores the exact 224x224 grayscale image array passed to classification; CAM output is resized to those pixel dimensions if needed; the viewer uses a shared square frame with no independent object-fit: contain padding. API study JSON identifies the target as the predicted class (heatmap_target), and the viewer captions Heatmap for: <class>. Tests use controlled classifier/CAM doubles to verify identical source pixels, 224x224 output dimensions, and argmax-class target selection; no trained checkpoint is installed, so this does not claim a real-model CAM evaluation. Viewer production build also passed with Vite 8.3.8.
+The service computes Grad-CAM for the classifier's predicted class from the same normalized 224x224 scan input shown in the viewer. If a map has another size, it is resized to the scan pixel dimensions; the viewer displays both layers in the same square frame. Study JSON identifies `heatmap_target`, and the viewer captions `Heatmap for: <class>`. Tests use controlled classifier/CAM doubles to verify pixel equality, 224x224 dimensions, and argmax-class selection. The current live API reports 10 studies with `heatmap_available:true`; maps were not visually reviewed during this documentation update.
 
 ## Segmentation demo
 
-Command: `python run.py train-seg -- --demo --epochs 1`
-
-Completed on synthetic volumes; training loss 0.969166, illustrative first-training-batch Dice 0.036684606904662354 (label 1: 0.040146622447198466; label 2: 0.03322259136212625), CPU. This is demo output and not held-out performance. Outputs are ignored under `AIML-02/outputs/segmentation/`.
+MSD Task04_Hippocampus is absent, so segmentation remains demo-only. `python run.py train-seg -- --demo --epochs 1` uses generated random volumes and artificial labels to verify the MONAI pipeline, not real MRI data. The saved metrics file says `demo:true`; its one-epoch Dice 0.036684606904662354 (label 1: 0.040146622447198466; label 2: 0.03322259136212625) is an illustrative training-batch score, not held-out performance.
 
 ## Viewer build and Docker
 
@@ -42,8 +46,6 @@ Docker runtime: **PENDING - run `docker compose -f AIML-02/docker/docker-compose
 
 ## Service helper commands
 
-- `python run.py reset-db`: completed. The database was queried afterward and contained 0 studies and 0 audit rows; generated study images were cleared.
-- `python run.py check-model`: completed in DEMO mode because `AIML-02/models/classifier.pt` is not present. It read one bundled DICOM and returned the explicitly marked DEMO values of confidence 0.5 and pneumonia probability 0.5. These are placeholders, not model results.
-- `python run.py load-samples`: completed against the updated API on a temporary port. All 10 bundled DICOMs returned HTTP 200 and were named using DICOM PatientID. The validation server used a temporary database, so these records were not added to the development database. For normal use, start the service with `python run.py serve` before running this helper.
-
-The existing ignored `AIML-02/models/best.pt` smoke checkpoint was also loaded on CPU by running `MODEL_PATH=AIML-02/models/best.pt python run.py check-model` (PowerShell equivalent: `$env:MODEL_PATH="AIML-02/models/best.pt"; python run.py check-model`). It produced a forward-pass result with model version `best`, confidence 0.5037637948989868, and pneumonia probability 0.5037637948989868. This only verifies checkpoint loading and inference plumbing; it is not an evaluation metric or a clinically meaningful result. The default `classifier.pt` is absent, so ordinary startup remains in DEMO mode.
+- `python run.py reset-db` previously completed and produced an empty dev database at that time. The current dev database has 10 studies and 0 audit rows.
+- `python run.py check-model` currently loads the local classifier in real mode; output is shown above.
+- `python run.py load-samples` was tested against a temporary API database; all 10 bundled DICOMs returned HTTP 200. The current local service also lists 10 studies.
