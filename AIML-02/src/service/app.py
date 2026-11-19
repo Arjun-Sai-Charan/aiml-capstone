@@ -21,6 +21,7 @@ from sqlalchemy import Column, DateTime, Float, String, Text, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 BASE = Path(__file__).resolve().parents[2]
+MODEL_IMAGE_SIZE = (224, 224)  # width, height; shared by the classifier input and displayed scan
 DATA_DIR = Path(os.getenv('DATA_DIR', BASE / 'data' / 'local')).resolve()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DATABASE_URL = os.getenv('DATABASE_URL', f"sqlite:///{(DATA_DIR / 'studies.db').as_posix()}")
@@ -105,7 +106,18 @@ def serialize(study):
     return {'id': study.id, 'filename': study.filename, 'name': study.filename,
             'prediction': study.prediction, 'confidence': study.confidence,
             'pneumonia_probability': study.pneumonia_probability, 'status': study.status,
-            'model_version': study.model_version, 'created_at': study.created_at.isoformat()}
+            'model_version': study.model_version,
+            'heatmap_target': study.prediction if study.model_version != 'DEMO' else None,
+            'heatmap_available': study.model_version != 'DEMO',
+            'created_at': study.created_at.isoformat()}
+
+
+def gradcam_for_class(model, tensor, predicted_class):
+    """Compute Grad-CAM for the predicted class on the classifier's exact input tensor."""
+    from pytorch_grad_cam import GradCAM
+    from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+    with GradCAM(model=model, target_layers=[model.features[-1]]) as cam:
+        return cam(input_tensor=tensor, targets=[ClassifierOutputTarget(predicted_class)])[0]
 
 
 def classify_image(image_array):
@@ -129,10 +141,8 @@ def classify_image(image_array):
     prediction = 'pneumonia' if predicted_class == 1 else 'no pneumonia'
     heatmap = image_array
     try:
-        from pytorch_grad_cam import GradCAM
-        from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-        with GradCAM(model=model, target_layers=[model.features[-1]]) as cam:
-            heatmap = cam(input_tensor=tensor, targets=[ClassifierOutputTarget(predicted_class)])[0]
+        # Explain the predicted class using the exact normalized 224x224 scan tensor sent to the model.
+        heatmap = gradcam_for_class(model, tensor, predicted_class)
     except Exception:
         pass
     return prediction, confidence, pneumonia_probability, version, heatmap
@@ -151,13 +161,20 @@ def create_study(data, name, is_dicom=False):
             getattr(dataset, 'WindowCenter', None), getattr(dataset, 'WindowWidth', None))
         image = Image.fromarray(array)
     else:
-        image = Image.open(io.BytesIO(data)).convert('L').resize((224, 224))
+        image = Image.open(io.BytesIO(data)).convert('L').resize(MODEL_IMAGE_SIZE)
+        array = np.asarray(image, dtype=np.uint8)
+    if (array.shape[1], array.shape[0]) != MODEL_IMAGE_SIZE:
+        image = Image.fromarray(array).resize(MODEL_IMAGE_SIZE, Image.Resampling.BILINEAR)
         array = np.asarray(image, dtype=np.uint8)
     normalized = array.astype(np.float32) / 255
     prediction, confidence, pneumonia_probability, version, heat = classify_image(normalized)
     heat = np.asarray(heat, dtype=np.float32)
     heat = (heat - heat.min()) / max(float(heat.max() - heat.min()), 1e-6)
-    color = np.zeros((224, 224, 3), dtype=np.uint8)
+    # Resize the CAM map to the model/display source pixels, then apply identical square framing in the viewer.
+    if heat.shape != array.shape:
+        heat = np.asarray(Image.fromarray(np.uint8(np.clip(heat, 0, 1) * 255)).resize(
+            (array.shape[1], array.shape[0]), Image.Resampling.BILINEAR), dtype=np.float32) / 255
+    color = np.zeros((*array.shape, 3), dtype=np.uint8)
     color[:, :, 0] = np.uint8(heat * 255)
     color[:, :, 1] = np.uint8(np.clip(1 - np.abs(heat - .5) * 2, 0, 1) * 80)
     sid = str(uuid.uuid4())

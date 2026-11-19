@@ -6,7 +6,7 @@ Environment: Windows 11, Python 3.12.10 in the repository `.venv`; CPU execution
 
 Command: `python run.py test`
 
-Result: **4 passed, 3 warnings in 11.70s** on the final run. Warnings are upstream Starlette/AnyIO and FastAPI lifecycle deprecations. API checks cover isolated temporary storage, raster and DICOM upload, both probability fields, review audit values, and duplicate-review rejection.
+Result: **6 passed, 7 warnings in 19.79s** on the current run. Warnings are upstream Starlette/AnyIO and FastAPI lifecycle deprecations. API checks cover isolated temporary storage, raster and DICOM upload, both probability fields, review audit values, and duplicate-review rejection.
 
 ## Dataset
 
@@ -25,6 +25,8 @@ The training and one held-out smoke evaluation ran on an earlier dataset sample 
 Command: `python run.py gradcam`
 
 Completed; 10 overlays were saved in the ignored `AIML-02/outputs/gradcam/` directory.
+
+Alignment verification: service preprocessing stores the exact 224x224 grayscale image array passed to classification; CAM output is resized to those pixel dimensions if needed; the viewer uses a shared square frame with no independent object-fit: contain padding. API study JSON identifies the target as the predicted class (heatmap_target), and the viewer captions Heatmap for: <class>. Tests use controlled classifier/CAM doubles to verify identical source pixels, 224x224 output dimensions, and argmax-class target selection; no trained checkpoint is installed, so this does not claim a real-model CAM evaluation. Viewer production build also passed with Vite 8.3.8.
 
 ## Segmentation demo
 

@@ -110,13 +110,15 @@ function App() {
           <small>Pneumonia probability: {(selected.pneumonia_probability * 100).toFixed(1)}%</small>
           <div className="scan">
             <img src={`${api}/studies/${selected.id}/image`} alt="Original scan" />
-            {overlay && <img className="heat" style={{ opacity: opacity / 100 }} src={`${api}/studies/${selected.id}/heatmap`} alt="Grad-CAM heatmap overlay" />}
+            {overlay && selected.heatmap_available && <img className="heat" style={{ opacity: opacity / 100 }} src={`${api}/studies/${selected.id}/heatmap`} alt={`Grad-CAM heatmap for ${selected.heatmap_target}`} />}
           </div>
           <div className="scan-controls">
             <label><input type="checkbox" checked={overlay} disabled={!health?.model_loaded} onChange={(event) => setOverlay(event.target.checked)} /> Show Grad-CAM overlay</label>
             <label>Overlay opacity <input aria-label="Overlay opacity" type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} /></label>
           </div>
+          {overlay && selected.heatmap_available && <p className="heatmap-caption">Heatmap for: {selected.heatmap_target}</p>}
           {!health?.model_loaded && <small>Grad-CAM is unavailable until a trained classifier is loaded.</small>}
+          <small className="interpretability-note">Heatmaps show where the model looked; they are not a diagnosis and can highlight non-clinical artifacts.</small>
           {reviewed ? <p className="decision">Decision recorded: {selected.status}</p> : <div className="review-controls">
             <label>Reviewer name<input value={reviewer} onChange={(event) => setReviewer(event.target.value)} /></label>
             <label>Comment<input value={comment} onChange={(event) => setComment(event.target.value)} /></label>

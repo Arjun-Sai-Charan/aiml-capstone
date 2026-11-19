@@ -13,6 +13,10 @@ A CPU smoke run on an earlier 3,000-row sample variant trained one epoch on 32 r
 
 ## Limitations and bias
 The rebuilt subset has balanced pneumonia classes and a 50/50 split between the two available negative source classes, unlike clinical prevalence; population and scanner coverage may not represent deployment populations. Labels can be noisy; bounding boxes are not used for localization and pneumonia labels are not equivalent to diagnosis. Artifacts, positioning, acquisition differences, and shortcuts can drive predictions. Segmentation demo data are synthetic if MSD is unavailable. DEMO mode returns neutral placeholder values and does not run a classifier or produce a Grad-CAM explanation. The committed project contains no model weights; a locally generated smoke checkpoint is ignored by Git.
+
+## Interpretability limits
+
+Grad-CAM heatmaps target the model's predicted class and show activation attribution, not a validated explanation. Heatmaps can highlight image edges, markers, devices, or other non-clinical artifacts; a highlighted region is not evidence that the model reasoned correctly. Heatmaps are not a diagnosis.
 # Model file placement
 
 A trained classifier checkpoint must be named `classifier.pt` and placed in `AIML-02/models/classifier.pt`, or selected with the `MODEL_PATH` environment variable. The classifier training command writes this checkpoint and `metrics.json` to `AIML-02/models` by default. For Colab/Kaggle, download both files from the training output directory and put them side by side in that folder. Confirm loading with `python run.py check-model`.
