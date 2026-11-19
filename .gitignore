@@ -19,3 +19,5 @@ AIML-02/data/dvc_storage/
 
 .vite-cache/
 .test-tmp/
+
+aiml_colab.zip
