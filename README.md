@@ -1,4 +1,4 @@
-# AI-Assisted Medical Imaging and Diagnosis System (AIML-02)
+﻿# AI-Assisted Medical Imaging and Diagnosis System (AIML-02)
 
 **For education only, not clinical use.**
 
@@ -11,7 +11,7 @@ A cross-platform educational project showing chest X-ray preprocessing and class
 - MONAI 3D U-Net workflow for MSD Hippocampus, with clearly marked synthetic demo mode.
 - Grad-CAM overlays for test images.
 - FastAPI local upload and optional Orthanc polling; SQLite study records and append-only review audit log.
-- React viewer with study list/detail, confidence bar, heatmap opacity control, review actions, and audit log.
+- React viewer with newest-first study list, model/demo banner, pneumonia probability and predicted-class confidence, Grad-CAM opacity control, reviewer/comment fields, and audit log.
 - DVC tracked processed dataset with a local remote.
 
 ## Architecture
@@ -55,12 +55,15 @@ Linux/Colab: activate the root `.venv` (or use `.venv/bin/python`) and run `pyth
 - Generate Grad-CAM overlays: `python run.py gradcam`
 - Train segmentation using MSD: `python run.py train-seg -- --epochs 2`
 - Run synthetic segmentation demo if MSD is absent: `python run.py train-seg -- --demo --epochs 1`
+- Reset local study database, uploads, and heatmaps: `python run.py reset-db`
 - Start local API at port 8000: `python run.py serve`
+- Check the classifier on one bundled DICOM sample: `python run.py check-model`
+- Load all bundled DICOM samples into the running local service: `python run.py load-samples`
 - Run tests: `python run.py test`
 - Start the React viewer in a second terminal: `cd AIML-02/viewer; npm install; npm run dev`
 - Validate Docker services: `docker compose -f AIML-02/docker/docker-compose.yml up --build`
 
-To use Orthanc samples, start Docker services, then run `python -m src.service.push_samples` with `PYTHONPATH` including `AIML-02` (or from the project folder with the module path configured).
+The classifier loader defaults to `AIML-02/models/classifier.pt`. After GPU training in Colab/Kaggle, download the generated `classifier.pt` from the training output directory and place it at `AIML-02/models/classifier.pt` (create the `models` folder if needed). Place its adjacent `metrics.json` in the same folder so the viewer can show the model version. Alternatively set `MODEL_PATH` to the checkpoint path before starting the service. Check that it loads with `python run.py check-model`. Without it, the UI shows a DEMO warning. To load the bundled DICOM scans, start the API with `python run.py serve`, open another terminal at the repository root, and run `python run.py load-samples`.
 
 ## Results
 
@@ -70,7 +73,7 @@ To use Orthanc samples, start Docker services, then run `python -m src.service.p
 | Historical classification smoke | Earlier data variant: 1 epoch, 32 rows, 5-row test subset; accuracy 0.40, AUC 0.50, precision 0.40, recall 1.00, F1 0.57; random initialization. It does not describe the current dataset. Full run: **PENDING - run `python run.py train-cls -- --epochs 3`**. |
 | Grad-CAM | 10 overlays generated locally from the earlier smoke checkpoint. |
 | Segmentation demo | Synthetic one-epoch training; illustrative first-batch Dice 0.0367 on synthetic data, not held-out performance. |
-| Automated tests | 4 passed, 17 upstream deprecation warnings in 15.90s. See [test output summary](AIML-02/docs/TEST_RESULTS.md). |
+| Automated tests | 4 passed, 3 upstream deprecation warnings in 11.70s. See [test output summary](AIML-02/docs/TEST_RESULTS.md). |
 | Viewer production build | Verified with Vite 8.3.8; `npm install`, `npm run build`, and dev server HTTP checks passed. |
 | Docker runtime | Compose config validated; **PENDING - run `docker compose -f AIML-02/docker/docker-compose.yml up --build`** when Docker daemon is available. |
 
@@ -80,7 +83,7 @@ Placeholder: capture the study list, selected scan with heatmap overlay, review 
 
 ## Limitations
 
-The balanced subset does not represent real-world disease prevalence. Dataset population and scanner coverage may not generalize; labels are noisy proxies, and bounding boxes are not localization ground truth. Image artifacts and acquisition differences can influence output. The historical smoke classification metrics use five test images from the earlier sample variant and do not describe the rebuilt dataset; the segmentation Dice is from synthetic training data. The local fallback is a simple image statistic if no checkpoint exists. No output supports clinical use.
+The balanced subset does not represent real-world disease prevalence. Dataset population and scanner coverage may not generalize; labels are noisy proxies, and bounding boxes are not localization ground truth. Image artifacts and acquisition differences can influence output. The historical smoke classification metrics use five test images from the earlier sample variant and do not describe the rebuilt dataset; the segmentation Dice is from synthetic training data. Without a checkpoint, the service runs in DEMO mode with neutral placeholder values and displays a warning; those values are not predictions. No output supports clinical use.
 
 ## Project documents
 

@@ -1,4 +1,4 @@
-# Test and run results
+﻿# Test and run results
 
 Environment: Windows 11, Python 3.12.10 in the repository `.venv`; CPU execution.
 
@@ -6,7 +6,7 @@ Environment: Windows 11, Python 3.12.10 in the repository `.venv`; CPU execution
 
 Command: `python run.py test`
 
-Result: **4 passed, 17 warnings in 10.18s** on the final run after the smoke checkpoint was generated. Warnings were upstream Starlette/AnyIO and FastAPI lifecycle deprecations plus Matplotlib/Pyparsing deprecations.
+Result: **4 passed, 3 warnings in 11.70s** on the final run. Warnings are upstream Starlette/AnyIO and FastAPI lifecycle deprecations. API checks cover isolated temporary storage, raster and DICOM upload, both probability fields, review audit values, and duplicate-review rejection.
 
 ## Dataset
 
@@ -37,3 +37,11 @@ Completed on synthetic volumes; training loss 0.969166, illustrative first-train
 Viewer install/build and dev server: **passed** using Node 24.13.0, Vite 8.3.8, and the official React plugin. `npm install` completed with 0 reported vulnerabilities; `npm run build` succeeded; the dev server served `/` and transformed `/src/main.jsx` with HTTP 200. Vite 8 removed the esbuild install path that was failing in the pasted log.
 
 Docker runtime: **PENDING - run `docker compose -f AIML-02/docker/docker-compose.yml up --build`**. Docker Compose configuration validation passed, but the Docker daemon is unavailable in this environment.
+
+## Service helper commands
+
+- `python run.py reset-db`: completed. The database was queried afterward and contained 0 studies and 0 audit rows; generated study images were cleared.
+- `python run.py check-model`: completed in DEMO mode because `AIML-02/models/classifier.pt` is not present. It read one bundled DICOM and returned the explicitly marked DEMO values of confidence 0.5 and pneumonia probability 0.5. These are placeholders, not model results.
+- `python run.py load-samples`: completed against the updated API on a temporary port. All 10 bundled DICOMs returned HTTP 200 and were named using DICOM PatientID. The validation server used a temporary database, so these records were not added to the development database. For normal use, start the service with `python run.py serve` before running this helper.
+
+The existing ignored `AIML-02/models/best.pt` smoke checkpoint was also loaded on CPU by running `MODEL_PATH=AIML-02/models/best.pt python run.py check-model` (PowerShell equivalent: `$env:MODEL_PATH="AIML-02/models/best.pt"; python run.py check-model`). It produced a forward-pass result with model version `best`, confidence 0.5037637948989868, and pneumonia probability 0.5037637948989868. This only verifies checkpoint loading and inference plumbing; it is not an evaluation metric or a clinically meaningful result. The default `classifier.pt` is absent, so ordinary startup remains in DEMO mode.

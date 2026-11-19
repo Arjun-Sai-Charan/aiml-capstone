@@ -18,3 +18,4 @@ AIML-02/data/dvc_storage/
 .viewer-validation/
 
 .vite-cache/
+.test-tmp/

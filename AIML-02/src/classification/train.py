@@ -1,4 +1,4 @@
-"""EfficientNet-B0 transfer learning on processed NPZ."""
+﻿"""EfficientNet-B0 transfer learning on processed NPZ."""
 import argparse,json,random
 from pathlib import Path
 import numpy as np, torch
@@ -42,13 +42,13 @@ def main():
   with torch.no_grad():
    for bx,by in dl(val): losses.append(lossfn(model(bx.to(device)),by.to(device)).item())
   v=float(np.mean(losses)) if losses else 0;print(f'epoch {epoch+1}: val_loss={v:.4f}')
-  if v<best: best=v;torch.save({'state_dict':model.state_dict(),'init':init},out/'best.pt')
+  if v<best: best=v;checkpoint={'state_dict':model.state_dict(),'init':init,'model_version':'efficientnet-b0-' + init.lower()}; torch.save(checkpoint,out/'classifier.pt'); torch.save(checkpoint,out/'best.pt')
  # held-out test evaluated once after selecting best epoch
  from sklearn.metrics import accuracy_score,roc_auc_score,precision_recall_fscore_support,confusion_matrix,roc_curve
- ck=torch.load(out/'best.pt',map_location=device,weights_only=False);model.load_state_dict(ck['state_dict']);model.eval(); ys=[];ps=[]
+ ck=torch.load(out/'classifier.pt',map_location=device,weights_only=False);model.load_state_dict(ck['state_dict']);model.eval(); ys=[];ps=[]
  with torch.no_grad():
   for bx,by in dl(test): ys.extend(by.tolist());ps.extend(model(bx.to(device)).softmax(1)[:,1].cpu().tolist())
- pred=np.asarray(ps)>=.5; precision,recall,f1,_=precision_recall_fscore_support(ys,pred,average='binary',zero_division=0) if ys else (0,0,0,0); metrics={'accuracy':float(accuracy_score(ys,pred)) if ys else None,'auc':float(roc_auc_score(ys,ps)) if len(set(ys))>1 else None,'precision':float(precision),'recall':float(recall),'f1':float(f1),'confusion_matrix':confusion_matrix(ys,pred).tolist() if ys else [],'test_n':len(ys),'device':device,'weights':ck['init'],'demo':bool(np.load(a.data).get('demo',False))}; (out/'metrics.json').write_text(json.dumps(metrics,indent=2));
+ pred=np.asarray(ps)>=.5; precision,recall,f1,_=precision_recall_fscore_support(ys,pred,average='binary',zero_division=0) if ys else (0,0,0,0); metrics={'accuracy':float(accuracy_score(ys,pred)) if ys else None,'auc':float(roc_auc_score(ys,ps)) if len(set(ys))>1 else None,'precision':float(precision),'recall':float(recall),'f1':float(f1),'confusion_matrix':confusion_matrix(ys,pred).tolist() if ys else [],'test_n':len(ys),'device':device,'weights':ck['init'],'model_version':ck['model_version'],'demo':bool(np.load(a.data).get('demo',False))}; (out/'metrics.json').write_text(json.dumps(metrics,indent=2),encoding='utf-8');
  import matplotlib
  matplotlib.use("Agg")
  import matplotlib.pyplot as plt
